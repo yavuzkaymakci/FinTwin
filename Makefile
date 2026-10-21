@@ -8,10 +8,10 @@ else
   VENV_BIN := .venv/bin
 endif
 
-.PHONY: help up down logs ps backend-run backend-test ml-install ml-run ml-test frontend-install frontend-run frontend-test frontend-build test
+.PHONY: help up down logs ps backend-run backend-test generate ml-install ml-run ml-test frontend-install frontend-run frontend-test frontend-build test
 
 help:
-	@echo "Targets: up down logs ps backend-run backend-test ml-install ml-run ml-test frontend-install frontend-run frontend-test frontend-build test"
+	@echo "Targets: up down logs ps backend-run backend-test generate ml-install ml-run ml-test frontend-install frontend-run frontend-test frontend-build test"
 
 ## Infrastructure (PostgreSQL, Kafka, Kafka UI)
 up:
@@ -32,6 +32,10 @@ backend-run:
 
 backend-test:
 	cd backend && ./mvnw test
+
+## Synthetic data (needs `make up`); override e.g. GENERATOR_CUSTOMERS=1000 make generate
+generate:
+	cd backend && ./mvnw spring-boot:run -Dspring-boot.run.profiles=local,generate
 
 ## ML service
 ml-install:

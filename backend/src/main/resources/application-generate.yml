@@ -1,0 +1,36 @@
+# Synthetic data generation profile. Combine with a datasource profile, e.g.
+#   ./mvnw spring-boot:run -Dspring-boot.run.profiles=local,generate
+# The application generates the data set, writes the report and exits.
+spring:
+  main:
+    web-application-type: none
+  datasource:
+    hikari:
+      # Lets the PostgreSQL driver collapse JDBC batches into multi-row INSERTs.
+      data-source-properties:
+        reWriteBatchedInserts: true
+      # Bulk load: a crash loses at most the last chunks, which a re-run regenerates anyway.
+      connection-init-sql: SET synchronous_commit TO OFF
+  kafka:
+    admin:
+      auto-create: false
+      fail-fast: false
+
+fintwin:
+  generator:
+    customer-count: ${GENERATOR_CUSTOMERS:5000}
+    months: ${GENERATOR_MONTHS:24}
+    seed: ${GENERATOR_SEED:42}
+    end-month: ${GENERATOR_END_MONTH:2026-09}
+    reset: ${GENERATOR_RESET:true}
+    chunk-size: 250
+    batch-size: 5000
+    parallelism: 0
+    write-threads: 4
+    # Relative to the backend directory (where mvnw runs).
+    report-path: ${GENERATOR_REPORT_PATH:../docs/data-generation.md}
+
+logging:
+  level:
+    com.fintwin: INFO
+    com.fintwin.generator: INFO
