@@ -1,8 +1,4 @@
-# Test profile: in-memory H2 in PostgreSQL compatibility mode, no external services required.
-spring:
-  datasource:
-    url: jdbc:h2:mem:fintwin;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
-    username: sa
-    password:
-  kafka:
-    bootstrap-servers: localhost:0
+# Test profile: datasource and Kafka connections are provided by Testcontainers (see TestcontainersConfiguration).
+logging:
+  level:
+    org.testcontainers: INFO
