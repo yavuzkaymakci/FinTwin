@@ -1,5 +1,6 @@
 package com.fintwin.generator;
 
+import com.fintwin.feed.outbox.OutboxRepository;
 import com.fintwin.generator.catalog.MerchantCatalog;
 import com.fintwin.generator.macro.MacroPath;
 import com.fintwin.generator.simulation.CustomerSimulator;
@@ -43,13 +44,16 @@ public class SyntheticDataGenerator {
     private final MacroIndicatorRepository macroRepository;
     private final JdbcBatchWriter writer;
     private final TransactionTemplate transactionTemplate;
+    private final OutboxRepository outbox;
 
     public SyntheticDataGenerator(GeneratorProperties properties, MacroIndicatorRepository macroRepository,
-                                  JdbcBatchWriter writer, TransactionTemplate transactionTemplate) {
+                                  JdbcBatchWriter writer, TransactionTemplate transactionTemplate,
+                                  OutboxRepository outbox) {
         this.properties = properties;
         this.macroRepository = macroRepository;
         this.writer = writer;
         this.transactionTemplate = transactionTemplate;
+        this.outbox = outbox;
     }
 
     public GenerationResult generate() {
@@ -64,8 +68,13 @@ public class SyntheticDataGenerator {
 
         MacroPath macro = loadMacroPath(props.startMonth());
         if (props.reset()) {
-            transactionTemplate.executeWithoutResult(s -> writer.truncateGeneratedTables());
-            log.info("Truncated previously generated data");
+            transactionTemplate.executeWithoutResult(s -> {
+                writer.truncateGeneratedTables();
+                // The feed outbox describes the old data set; the twin must be reset before replaying the new one.
+                outbox.invalidate();
+            });
+            log.info("Truncated previously generated data and invalidated the feed outbox "
+                    + "(reset the twin with POST /api/admin/twins/reset before replaying)");
         } else if (writer.countCustomers() > 0) {
             throw new IllegalStateException("Generated data already exists; run with fintwin.generator.reset=true");
         }
