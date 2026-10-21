@@ -17,6 +17,9 @@ spring:
       fail-fast: false
 
 fintwin:
+  twin:
+    consumer:
+      enabled: false
   generator:
     customer-count: ${GENERATOR_CUSTOMERS:5000}
     months: ${GENERATOR_MONTHS:24}

@@ -11,6 +11,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fintwin}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
+    # Bulk loads (generator, twin replay): more buffer cache and fewer forced checkpoints than the defaults.
+    command: ["postgres", "-c", "shared_buffers=512MB", "-c", "max_wal_size=4GB", "-c", "checkpoint_timeout=15min",
+              "-c", "effective_cache_size=2GB", "-c", "work_mem=32MB", "-c", "maintenance_work_mem=256MB"]
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:

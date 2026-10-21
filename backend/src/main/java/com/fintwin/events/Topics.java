@@ -11,6 +11,7 @@ import com.fintwin.events.v1.TransactionRecordedV1;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /** Kafka topics of the core banking feed ({@code fintwin.<domain>.<event>.v<N>}) and their event types. */
 public final class Topics {
@@ -41,6 +42,9 @@ public final class Topics {
             TRANSACTIONS_RECORDED, CARD_STATEMENTS_ISSUED, LOANS_DISBURSED, LOAN_INSTALLMENTS_SETTLED,
             PAYMENTS_PAST_DUE);
 
+    private static final Map<Class<? extends CoreBankingEvent>, String> TOPIC_BY_TYPE = EVENT_TYPES.entrySet().stream()
+            .collect(Collectors.toUnmodifiableMap(Map.Entry::getValue, Map.Entry::getKey));
+
     private Topics() {
     }
 
@@ -49,10 +53,10 @@ public final class Topics {
     }
 
     public static String topicOf(CoreBankingEvent event) {
-        return EVENT_TYPES.entrySet().stream()
-                .filter(e -> e.getValue() == event.getClass())
-                .map(Map.Entry::getKey)
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("No topic for " + event.getClass()));
+        String topic = TOPIC_BY_TYPE.get(event.getClass());
+        if (topic == null) {
+            throw new IllegalArgumentException("No topic for " + event.getClass());
+        }
+        return topic;
     }
 }

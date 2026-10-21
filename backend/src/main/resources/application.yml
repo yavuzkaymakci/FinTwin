@@ -12,6 +12,24 @@ spring:
     locations: classpath:db/migration
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: all
+      compression-type: lz4
+      batch-size: 262144
+      properties:
+        linger.ms: 10
+        enable.idempotence: true
+    consumer:
+      group-id: fintwin-twin
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      # Large batches: each batch rewrites the projection of every customer it touches once.
+      max-poll-records: 20000
+      fetch-min-size: 4194304
+      fetch-max-wait: 500ms
+      properties:
+        max.partition.fetch.bytes: 16777216
+        fetch.max.bytes: 67108864
 
 server:
   port: ${SERVER_PORT:8080}
@@ -20,7 +38,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: always

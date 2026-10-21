@@ -2,3 +2,11 @@
 logging:
   level:
     org.testcontainers: INFO
+    org.apache.kafka: WARN
+
+# The twin listener joins a consumer group; several cached test contexts would split its partitions. Only the
+# twin pipeline test enables it.
+fintwin:
+  twin:
+    consumer:
+      enabled: false
