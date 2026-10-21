@@ -1,0 +1,114 @@
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --text: #1c2430;
+  --muted: #5b6676;
+  --border: #e1e5ea;
+  --up: #1f8f4e;
+  --down: #c0392b;
+  --unknown: #8a6d1f;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12161c;
+    --surface: #1b2129;
+    --text: #e6eaef;
+    --muted: #9aa5b3;
+    --border: #2c3440;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+}
+
+.container {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 48px 16px;
+}
+
+.page-header h1 {
+  margin: 0 0 4px;
+}
+
+.page-header p {
+  margin: 0 0 24px;
+  color: var(--muted);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.card-header,
+.card-footer,
+.components li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.card-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.components {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0;
+}
+
+.components li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.card-footer {
+  margin-top: 16px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--unknown);
+}
+
+.badge-up {
+  background: var(--up);
+}
+
+.badge-down,
+.badge-unreachable,
+.badge-out_of_service {
+  background: var(--down);
+}
+
+.error {
+  color: var(--down);
+}
+
+button {
+  font: inherit;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}

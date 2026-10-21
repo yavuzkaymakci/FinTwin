@@ -1,0 +1,2 @@
+-- V1: baseline migration for the FinTwin schema.
+-- Intentionally empty; domain tables are introduced in later migrations.
