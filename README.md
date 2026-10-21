@@ -9,7 +9,8 @@ built on Spring AI run scenarios from natural language and coach customers on th
 Macro data comes from the Central Bank of the Republic of Türkiye (TCMB EVDS); customer and transaction data is
 synthetic.
 
-> Status: early scaffold — infrastructure and service skeletons only.
+> Status: retail banking domain model and deterministic synthetic data generator in place; models, twins and
+> simulation are next.
 
 ## Stack
 
@@ -36,19 +37,23 @@ Architecture: [docs/architecture.md](docs/architecture.md).
 # 1. Infrastructure: PostgreSQL, Kafka, Kafka UI (waits until healthy)
 make up
 
-# 2. Backend -> http://localhost:8080/actuator/health
+# 2. Synthetic portfolio (5,000 customers x 24 months, ~11 M rows, ~2-3 min)
+make generate
+
+# 3. Backend -> http://localhost:8080/actuator/health, e.g. /api/customers/1
 make backend-run
 
-# 3. ML service -> http://localhost:8000/health (API docs at /docs)
+# 4. ML service -> http://localhost:8000/health (API docs at /docs)
 make ml-install
 make ml-run
 
-# 4. Frontend -> http://localhost:5173
+# 5. Frontend -> http://localhost:5173
 make frontend-install
 make frontend-run
 ```
 
-Kafka UI is available at http://localhost:8085. Stop the infrastructure with `make down`.
+Kafka UI is available at http://localhost:8085. How the data is generated and what it looks like:
+[docs/data-generation.md](docs/data-generation.md). Stop the infrastructure with `make down`.
 
 Without make, see the command table in [CLAUDE.md](CLAUDE.md#development-commands).
 
@@ -57,3 +62,5 @@ Without make, see the command table in [CLAUDE.md](CLAUDE.md#development-command
 ```bash
 make test   # backend (JUnit), ml-service (pytest), frontend (Vitest)
 ```
+
+Backend integration tests start PostgreSQL and Kafka with Testcontainers, so Docker must be running.
