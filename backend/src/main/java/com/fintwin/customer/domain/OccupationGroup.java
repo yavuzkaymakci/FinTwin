@@ -1,0 +1,20 @@
+package com.fintwin.customer.domain;
+
+public enum OccupationGroup {
+    STUDENT,
+    PUBLIC_SECTOR,
+    OFFICE_WORKER,
+    IT_PROFESSIONAL,
+    HEALTHCARE,
+    EDUCATION,
+    FINANCE,
+    MANUFACTURING,
+    RETAIL_SERVICES,
+    HOSPITALITY,
+    CONSTRUCTION,
+    LOGISTICS,
+    TRADESPERSON,
+    SHOP_OWNER,
+    FREELANCER,
+    RETIRED
+}
