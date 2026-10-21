@@ -7,5 +7,7 @@ public enum Channel {
     /** EFT or FAST (instant) money transfer. */
     EFT_FAST,
     /** Standing order / direct debit (otomatik ödeme talimatı). */
-    AUTO_PAYMENT
+    AUTO_PAYMENT,
+    /** Posting originated by the bank itself, e.g. interest. */
+    SYSTEM
 }

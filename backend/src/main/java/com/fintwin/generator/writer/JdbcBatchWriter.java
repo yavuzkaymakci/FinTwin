@@ -42,8 +42,8 @@ public class JdbcBatchWriter {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)""";
     private static final String INSERT_ACCOUNT = """
             INSERT INTO account (id, customer_id, account_type, currency, balance, opened_at, closed_at,
-                                 interest_rate, maturity_date, credit_limit, statement_day, due_day)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""";
+                                 interest_rate, maturity_date, credit_limit, statement_day, due_day, opening_balance)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""";
     private static final String INSERT_STATEMENT = """
             INSERT INTO card_statement (id, account_id, statement_date, due_date, statement_balance, minimum_payment,
                                         paid_amount, paid_at, days_past_due)
@@ -60,8 +60,9 @@ public class JdbcBatchWriter {
             INSERT INTO merchant (id, name, category_id, city) VALUES (?, ?, ?, ?)""";
     private static final String INSERT_TRANSACTION = """
             INSERT INTO bank_transaction (id, account_id, customer_id, merchant_id, amount, currency, direction,
-                                          channel, installment_count, raw_description, occurred_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""";
+                                          channel, installment_count, raw_description, occurred_at,
+                                          counterpart_transaction_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""";
     private static final String INSERT_EVENT = """
             INSERT INTO customer_event (id, customer_id, event_type, event_date, account_id, loan_id, days_past_due,
                                         details)
@@ -223,6 +224,7 @@ public class JdbcBatchWriter {
             ps.setBigDecimal(10, a.statementDay == null ? null : Sim.toMoney(a.creditLimitCents));
             setInteger(ps, 11, a.statementDay);
             setInteger(ps, 12, a.dueDay);
+            ps.setBigDecimal(13, Sim.toMoney(a.openingBalanceCents));
         });
         batch(INSERT_STATEMENT, statements, batchSize, (ps, s) -> {
             ps.setLong(1, s.id);
@@ -274,6 +276,11 @@ public class JdbcBatchWriter {
             ps.setInt(9, t.installmentCount);
             ps.setString(10, t.description);
             ps.setObject(11, t.occurredAt);
+            if (t.counterpart == null) {
+                ps.setNull(12, Types.BIGINT);
+            } else {
+                ps.setLong(12, t.counterpart.id);
+            }
         });
         batchIndexed(INSERT_EVENT, events, batchSize, (ps, e, i) -> {
             ps.setLong(1, prepared.firstEventId() + i);

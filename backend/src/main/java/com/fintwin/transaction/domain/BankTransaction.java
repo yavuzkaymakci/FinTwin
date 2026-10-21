@@ -69,6 +69,10 @@ public class BankTransaction {
     @Column(name = "occurred_at", nullable = false)
     private Instant occurredAt;
 
+    /** Other leg of a transfer between the customer's own accounts, if any. */
+    @Column(name = "counterpart_transaction_id")
+    private Long counterpartTransactionId;
+
     protected BankTransaction() {
     }
 
@@ -129,5 +133,9 @@ public class BankTransaction {
 
     public Instant getOccurredAt() {
         return occurredAt;
+    }
+
+    public Long getCounterpartTransactionId() {
+        return counterpartTransactionId;
     }
 }

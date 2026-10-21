@@ -35,7 +35,7 @@ class MacroIndicatorRepositoryTests {
 
     @Test
     void seedsMerchantCategories() {
-        assertThat(categoryRepository.count()).isEqualTo(20);
+        assertThat(categoryRepository.count()).isEqualTo(21);
         assertThat(categoryRepository.findByCode("GROCERY")).isPresent();
     }
 }

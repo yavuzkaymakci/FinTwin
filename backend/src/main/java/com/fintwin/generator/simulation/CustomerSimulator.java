@@ -433,6 +433,9 @@ public final class CustomerSimulator {
                     renter = false;
                 }
             }
+            for (Sim.Account account : h.accounts) {
+                account.openingBalanceCents = account.type == AccountType.CREDIT_CARD ? revolving : account.balanceCents;
+            }
             double fixedReal = (renter ? rent : 0)
                     + bills.stream().mapToDouble(Bill::baseAmount).sum()
                     + subscriptions.stream().mapToDouble(Subscription::baseAmount).sum();
@@ -1116,10 +1119,8 @@ public final class CustomerSimulator {
                 long move = excess / 2;
                 checking.balanceCents -= move;
                 deposit.balanceCents += move;
-                txn(checking, null, move, Direction.DEBIT, Channel.EFT_FAST, 1,
-                        DescriptionNoiser.depositTransfer(true, r), at(d, 18, 23), Category.TRANSFER);
-                txn(deposit, null, move, Direction.CREDIT, Channel.EFT_FAST, 1,
-                        DescriptionNoiser.depositTransfer(true, r), at(d, 18, 23), Category.TRANSFER);
+                transfer(checking, move, DescriptionNoiser.depositTransfer(true, r), deposit, move,
+                        DescriptionNoiser.depositTransfer(true, r), at(d, 18, 23), Channel.EFT_FAST, Category.TRANSFER);
                 excess -= move;
             }
             if (usd != null && usd.closedAt == null && r.chance(0.35)) {
@@ -1128,10 +1129,8 @@ public final class CustomerSimulator {
                 if (usdAmount > 0) {
                     checking.balanceCents -= tryAmount;
                     usd.balanceCents += usdAmount;
-                    txn(checking, null, tryAmount, Direction.DEBIT, Channel.EFT_FAST, 1,
-                            DescriptionNoiser.fxPurchase(false, r), at(d, 10, 17), Category.FX);
-                    txn(usd, null, usdAmount, Direction.CREDIT, Channel.EFT_FAST, 1,
-                            DescriptionNoiser.fxPurchase(true, r), at(d, 10, 17), Category.FX);
+                    transfer(checking, tryAmount, DescriptionNoiser.fxPurchase(false, r), usd, usdAmount,
+                            DescriptionNoiser.fxPurchase(true, r), at(d, 10, 17), Channel.EFT_FAST, Category.FX);
                 }
             }
         }
@@ -1141,8 +1140,11 @@ public final class CustomerSimulator {
                 return;
             }
             double rate = Math.max(macro.policyRate(ym) - 0.04, 0);
-            // 32-day rollover with interest capitalised, net of withholding tax.
-            deposit.balanceCents += Math.round(deposit.balanceCents * rate / 12 * 0.85);
+            // 32-day rollover with interest capitalised, net of withholding tax, posted as a bank transaction.
+            long interest = Math.round(deposit.balanceCents * rate / 12 * 0.85);
+            deposit.balanceCents += interest;
+            txn(deposit, null, interest, Direction.CREDIT, Channel.SYSTEM, 1,
+                    DescriptionNoiser.depositInterest(r), at(ym.atEndOfMonth(), 23, 24), Category.INTEREST);
             deposit.interestRate = BigDecimal.valueOf(rate).setScale(6, RoundingMode.HALF_EVEN);
             deposit.maturityDate = ym.atEndOfMonth().plusDays(32);
         }
@@ -1156,10 +1158,8 @@ public final class CustomerSimulator {
                 long move = Math.min(deposit.balanceCents, needed - checking.balanceCents);
                 deposit.balanceCents -= move;
                 checking.balanceCents += move;
-                txn(deposit, null, move, Direction.DEBIT, Channel.EFT_FAST, 1,
-                        DescriptionNoiser.depositTransfer(false, r), at(d, 0, 2), Category.TRANSFER);
-                txn(checking, null, move, Direction.CREDIT, Channel.EFT_FAST, 1,
-                        DescriptionNoiser.depositTransfer(false, r), at(d, 0, 2), Category.TRANSFER);
+                transfer(deposit, move, DescriptionNoiser.depositTransfer(false, r), checking, move,
+                        DescriptionNoiser.depositTransfer(false, r), at(d, 0, 2), Channel.EFT_FAST, Category.TRANSFER);
             }
             return checking.balanceCents >= needed;
         }
@@ -1207,6 +1207,8 @@ public final class CustomerSimulator {
             }
             double rate = cardMonthlyRate(macro.policyRate(month)) + (pastDue > 0 ? 0.003 : 0);
             long interest = revolving > 0 ? Math.round(revolving * rate) : 0;
+            txn(card, null, interest, Direction.DEBIT, Channel.SYSTEM, 1,
+                    DescriptionNoiser.cardInterest(pastDue > 0, r), at(d, 0, 1), Category.INTEREST);
             revolving += interest + cycle + billed;
             cycle = 0;
             if (revolving <= 0) {
@@ -1277,10 +1279,12 @@ public final class CustomerSimulator {
                 statement.paidAt = d;
             }
             OffsetDateTime time = automatic ? at(d, 1, 7) : at(d, 9, 22);
-            txn(checking, null, amount, Direction.DEBIT, automatic ? Channel.AUTO_PAYMENT : Channel.EFT_FAST, 1,
+            Sim.Transaction debit = txn(checking, null, amount, Direction.DEBIT,
+                    automatic ? Channel.AUTO_PAYMENT : Channel.EFT_FAST, 1,
                     DescriptionNoiser.cardPaymentFromAccount(cardLast4, automatic, r), time, Category.CARD_PAYMENT);
-            txn(card, null, amount, Direction.CREDIT, Channel.EFT_FAST, 1, DescriptionNoiser.cardPaymentReceived(r),
-                    time, Category.CARD_PAYMENT);
+            Sim.Transaction credit = txn(card, null, amount, Direction.CREDIT, Channel.EFT_FAST, 1,
+                    DescriptionNoiser.cardPaymentReceived(r), time, Category.CARD_PAYMENT);
+            link(debit, credit);
         }
 
         private void cureCard(LocalDate d) {
@@ -1684,13 +1688,30 @@ public final class CustomerSimulator {
             return OffsetDateTime.of(d, LocalTime.ofSecondOfDay(second), ISTANBUL).withOffsetSameInstant(ZoneOffset.UTC);
         }
 
-        private void txn(Sim.Account account, MerchantRef merchant, long amount, Direction direction, Channel channel,
-                         int installments, String description, OffsetDateTime time, Category category) {
+        private Sim.Transaction txn(Sim.Account account, MerchantRef merchant, long amount, Direction direction,
+                                    Channel channel, int installments, String description, OffsetDateTime time,
+                                    Category category) {
             if (amount <= 0) {
-                return;
+                return null;
             }
-            h.transactions.add(new Sim.Transaction(account, merchant, amount, direction, channel, installments,
-                    description, time, category, sequence++));
+            Sim.Transaction t = new Sim.Transaction(account, merchant, amount, direction, channel, installments,
+                    description, time, category, sequence++);
+            h.transactions.add(t);
+            return t;
+        }
+
+        /** Both legs of a transfer between the customer's own accounts: same instant, linked to each other. */
+        private void transfer(Sim.Account from, long fromAmount, String fromText, Sim.Account to, long toAmount,
+                              String toText, OffsetDateTime time, Channel channel, Category category) {
+            link(txn(from, null, fromAmount, Direction.DEBIT, channel, 1, fromText, time, category),
+                    txn(to, null, toAmount, Direction.CREDIT, channel, 1, toText, time, category));
+        }
+
+        private static void link(Sim.Transaction a, Sim.Transaction b) {
+            if (a != null && b != null) {
+                a.counterpart = b;
+                b.counterpart = a;
+            }
         }
     }
 }

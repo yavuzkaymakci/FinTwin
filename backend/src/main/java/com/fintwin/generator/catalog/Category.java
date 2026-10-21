@@ -23,7 +23,8 @@ public enum Category {
     TRANSFER(17),
     LOAN(18),
     CARD_PAYMENT(19),
-    FX(20);
+    FX(20),
+    INTEREST(21);
 
     private final int id;
 

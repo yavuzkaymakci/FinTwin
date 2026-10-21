@@ -65,6 +65,41 @@ class CustomerSimulatorTests {
     }
 
     @Test
+    void accountBalancesFollowFromOpeningBalanceAndTransactions() {
+        for (Sim.CustomerHistory h : portfolio) {
+            for (Sim.Account a : h.accounts) {
+                long net = 0;
+                for (Sim.Transaction t : h.transactions) {
+                    if (t.account == a) {
+                        net += t.direction == com.fintwin.transaction.domain.Direction.CREDIT ? t.amountCents
+                                : -t.amountCents;
+                    }
+                }
+                long expected = a.type == AccountType.CREDIT_CARD ? a.openingBalanceCents - net
+                        : a.openingBalanceCents + net;
+                assertThat(a.balanceCents).as("customer %d account %s", h.index, a.type).isEqualTo(expected);
+            }
+        }
+    }
+
+    @Test
+    void internalTransferLegsAreLinkedAndSimultaneous() {
+        long linked = 0;
+        for (Sim.CustomerHistory h : portfolio) {
+            for (Sim.Transaction t : h.transactions) {
+                if (t.counterpart != null) {
+                    linked++;
+                    assertThat(t.counterpart.counterpart).isSameAs(t);
+                    assertThat(t.counterpart.occurredAt).isEqualTo(t.occurredAt);
+                    assertThat(t.counterpart.account).isNotSameAs(t.account);
+                    assertThat(t.counterpart.direction).isNotEqualTo(t.direction);
+                }
+            }
+        }
+        assertThat(linked).isGreaterThan(1_000);
+    }
+
+    @Test
     void loanPlansAreConsistent() {
         long loans = 0;
         for (Sim.CustomerHistory h : portfolio) {

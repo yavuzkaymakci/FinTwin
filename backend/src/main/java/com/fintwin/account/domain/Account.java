@@ -45,6 +45,10 @@ public class Account {
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal balance;
 
+    /** Balance when the account entered the recorded history; balance = opening + movements. */
+    @Column(name = "opening_balance", nullable = false, precision = 19, scale = 2)
+    private BigDecimal openingBalance;
+
     @Column(name = "opened_at", nullable = false)
     private LocalDate openedAt;
 
@@ -75,6 +79,7 @@ public class Account {
         this.currency = Objects.requireNonNull(currency);
         this.openedAt = Objects.requireNonNull(openedAt);
         this.balance = BigDecimal.ZERO;
+        this.openingBalance = BigDecimal.ZERO;
     }
 
     public static Account checking(Customer customer, Currency currency, LocalDate openedAt) {
@@ -127,6 +132,10 @@ public class Account {
 
     public BigDecimal getBalance() {
         return balance;
+    }
+
+    public BigDecimal getOpeningBalance() {
+        return openingBalance;
     }
 
     public LocalDate getOpenedAt() {

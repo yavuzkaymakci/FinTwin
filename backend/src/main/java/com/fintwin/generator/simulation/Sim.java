@@ -55,6 +55,8 @@ public final class Sim {
         public final LocalDate openedAt;
         public LocalDate closedAt;
         public long balanceCents;
+        /** Balance when the account enters the simulated horizon (at its start, or when opened during it). */
+        public long openingBalanceCents;
         public BigDecimal interestRate;
         public LocalDate maturityDate;
         public long creditLimitCents;
@@ -153,6 +155,8 @@ public final class Sim {
         public final Category category;
         /** Creation order within the customer, used as a stable tie-breaker when sorting by time. */
         public final int sequence;
+        /** Other leg of a transfer between the customer's own accounts, if any. */
+        public Transaction counterpart;
 
         public Transaction(Account account, MerchantRef merchant, long amountCents, Direction direction,
                            Channel channel, int installmentCount, String description, OffsetDateTime occurredAt,

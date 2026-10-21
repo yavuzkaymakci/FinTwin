@@ -239,6 +239,16 @@ public final class DescriptionNoiser {
                 : r.pick(new String[]{"VADELI HESAPTAN VIRMAN", "VADELI BOZDURMA", "HESAPLAR ARASI VIRMAN"});
     }
 
+    public static String depositInterest(Rand r) {
+        return r.pick(new String[]{"VADELI HESAP FAIZ TAHAKKUKU", "MEVDUAT FAIZI NET", "VADE SONU FAIZ ODEMESI"});
+    }
+
+    public static String cardInterest(boolean late, Rand r) {
+        return late
+                ? r.pick(new String[]{"GECIKME FAIZI", "GECIKME FAIZI VE BSMV", "KK GECIKME FAIZ"})
+                : r.pick(new String[]{"AKDI FAIZ", "KART FAIZI", "ALISVERIS FAIZI"});
+    }
+
     public static String accountClosing(Rand r) {
         return r.pick(new String[]{"HESAP KAPAMA FAST GIDEN", "HESAP KAPANIS BAKIYE TRANSFERI", "EFT HESAP KAPAMA"});
     }
