@@ -38,3 +38,6 @@ frontend/coverage/
 
 # Local Claude Code settings
 .claude/settings.local.json
+
+# Local run logs (long-running jobs write here)
+logs/
