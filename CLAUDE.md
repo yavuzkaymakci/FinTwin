@@ -44,7 +44,8 @@ See [docs/architecture.md](docs/architecture.md) for the diagram and flows.
 - The **assistants** (`com.fintwin.assistant`, Spring AI 1.1.8) are the scenario assistant (RISK_ANALYST) and
   the customer coach (CUSTOMER). The chat provider is a profile: none (default, 503), `anthropic`
   (`ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, default claude-sonnet-5-5) or `ollama` (`OLLAMA_MODEL`,
-  `OLLAMA_BASE_URL`). Tools, safety and evaluation: [docs/assistants.md](docs/assistants.md).
+  `OLLAMA_BASE_URL`), or `ai-demo` (`DemoChatModel`: scripted Turkish answers that call the real tools; refuses
+  to start together with a real provider). Tools, safety and evaluation: [docs/assistants.md](docs/assistants.md).
 - The synthetic data generator lives in the backend (`com.fintwin.generator`, `generate` profile) and also writes the
   `ground_truth` schema (hidden variables and labels). Models train on the public schema only and use
   `ground_truth.*` for labels/validation. Details and the current data report: [docs/data-generation.md](docs/data-generation.md).
@@ -52,7 +53,8 @@ See [docs/architecture.md](docs/architecture.md) for the diagram and flows.
   to Kafka from a transactional-outbox table (`feed.outbox`). The **customer twin** (`com.fintwin.twin`) is fed only
   by these events: event store, projection, monthly snapshots, as-of and rebuild in the `twin` schema.
   Design, event schemas and the feature dictionary: [docs/twin.md](docs/twin.md).
-- The frontend only talks to the backend; Vite proxies `/api` and `/actuator` in dev.
+- The frontend only talks to the backend; Vite proxies `/api`, `/actuator`, `/swagger-ui` and `/v3/api-docs` in
+  dev. The backend has springdoc (Swagger UI at `/swagger-ui/index.html`).
 - Kafka topic auto-creation is disabled; topics are declared explicitly (e.g. `NewTopic` beans).
   Naming: `fintwin.<domain>.<event>.v<N>`, e.g. `fintwin.transactions.recorded.v1`.
 
@@ -96,7 +98,7 @@ See [docs/architecture.md](docs/architecture.md) for the diagram and flows.
     db/migration/           Flyway migrations V<N>__<description>.sql (V2 domain, V3 reference data, V4 ground truth,
                             V5 feed support columns, V6 feed outbox, V7 twin, V8 ML roles + risk scores,
                             V9 simulation schema + preset scenarios, V10 assistant conversations, audit log and
-                            chat memory)
+                            chat memory, V11 event-store `recorded_at` index for the live view)
 /ml-service   FastAPI app
   app/main.py               app factory
   app/api/                  routers: models (active info), risk (score, batch, explain), categorize, simulations
@@ -110,13 +112,21 @@ See [docs/architecture.md](docs/architecture.md) for the diagram and flows.
   app/labeling/ app/evaluation/   the ONLY code that may read ground_truth (label export, PD vs hidden stress)
   artifacts/                models, label parquet, reports (gitignored; ML_ARTIFACTS_DIR)
   tests/                    pytest (DB tests skip when PostgreSQL is unreachable)
-/frontend     Vite + React + TS
-  src/api/                  typed API clients
-  src/components/           components, tests colocated as *.test.tsx
+/frontend     Vite + React 18 + TS, React Router, TanStack Query, Recharts, Tailwind + Radix (shadcn-style)
+  src/api/                  client.ts (fetch + identity headers), sse.ts (POST event stream), types.ts, endpoints.ts
+  src/auth/identity.ts      the ONLY place that knows the user (demo headers now, JWT in step 8)
+  src/components/ui/        button, primitives, radix wrappers;  layout/ (AppShell, StatusBanner, SystemIndicator)
+  src/components/           common.tsx (states, KPI, risk badges), charts.tsx, chat/ (ChatPanel, tool tags, cards)
+  src/pages/analyst/        dashboard, customers, twin detail, scenarios, runs, assistant, live, system
+  src/pages/customer/       my overview, coach
+  src/lib/                  tr-TR formatting, labels (Turkish), risk grades, theme, shared queries
+  tests colocated as *.test.ts(x); src/test/ (setup, render helpers)
 /infra        docker-compose.yml (Postgres tuned for bulk loads), .env.example
-/scripts      measure-twin.sh (clean timed end-to-end replay), ai_eval.py (assistant evaluation, manual only)
-/docs         architecture.md, data-generation.md, twin.md, models.md, simulation.md, assistants.md,
-              ai-eval/ (Turkish question sets), progress.md (resume notes)
+/scripts      start-all.bat / stop-all.bat (one-click run, cmd), setup-fresh.bat + setup_steps.py (new machine),
+              measure-twin.sh (clean timed end-to-end replay), ai_eval.py (assistant evaluation, manual only)
+/docs         architecture.md, data-generation.md, twin.md, models.md, simulation.md, assistants.md, setup.md,
+              reproducibility.md (+ .json reference values), screenshots/, ai-eval/ (Turkish question sets),
+              progress.md (resume notes)
 /logs         output of long-running jobs (gitignored)
 ```
 
@@ -194,8 +204,12 @@ ML service (Python)
 
 Frontend (TypeScript)
 - Strict TypeScript; no `any`.
-- Function components + hooks. API calls go through `src/api/` typed clients.
-- Tests with Vitest + Testing Library, colocated next to the component.
+- Function components + hooks. API calls go through `src/api/` typed clients; server state via TanStack Query.
+- UI text is Turkish, code English; format numbers, money, percentages and dates only with `src/lib/format.ts`
+  (tr-TR). Colours come from the CSS tokens in `index.css` (light/dark, `--grade-1..10`, positive/negative).
+- Identity (role, user, customer) only through `src/auth/identity.ts`; never set the demo headers elsewhere.
+- Every screen handles loading (skeleton), error (`ErrorState`) and empty (`EmptyState`) states.
+- Tests with Vitest + Testing Library, colocated next to the component (`renderWithProviders`, `stubFetch`).
 
 ## Development commands
 
@@ -219,6 +233,8 @@ Make targets (need GNU make + POSIX shell; on Windows use Git Bash/WSL — or ru
 | Backend with a chat model | | `SPRING_PROFILES_ACTIVE=local,anthropic ./mvnw spring-boot:run` (needs `ANTHROPIC_API_KEY`) or `local,ollama` |
 | Assistant evaluation (manual, real LLM) | | `python scripts/ai_eval.py --run-a <BASE run> --run-b <shock run>` |
 | Preset scenarios (background) | `make ml-presets` | `python -m app.simulation.run_presets [--start 2026-10-01]` |
+| One-click start / stop (Windows cmd) | | `scripts\start-all.bat [anthropic\|ollama]` / `scripts\stop-all.bat` |
+| Fresh install on a new machine | | `scripts\setup-fresh.bat [--check\|--force]` (see docs/setup.md) |
 | Install frontend | `make frontend-install` | `cd frontend && npm install` |
 | Run frontend | `make frontend-run` | `cd frontend && npm run dev` |
 | Test / build frontend | `make frontend-test` / `make frontend-build` | `npm test` / `npm run build` |
@@ -237,7 +253,11 @@ Simulation API: `GET/POST /api/scenarios`, `PUT/DELETE /api/scenarios/{id}` (pre
 `topCustomers`), `GET /api/simulation-runs/{id}`, `/api/simulation-runs/compare?ids=1,2`,
 `GET /api/twins/{id}/forecast[?runId=]`. Assistants: `POST /api/assistants/scenario/chat`,
 `/api/assistants/coach/chat` (`{conversationId?, message}`; headers `X-Demo-User`, `X-Demo-Role`,
-`X-Demo-Customer-Id` until step 7) and `/chat/stream` (SSE). ml-service: `POST /v1/goals/simulate`.
+`X-Demo-Customer-Id` until step 8) and `/chat/stream` (SSE), `GET /api/assistants/{scenario|coach}/conversations[/{id}]`.
+ml-service: `POST /v1/goals/simulate`. Web UI endpoints: `GET /api/customers` (search, segment, grade, sort,
+paging), `/api/portfolio/summary`, `/api/portfolio/segments`, `/api/system/status`, `/api/live/twin`,
+`/api/simulation-runs?scenarioId=&limit=`, `POST /api/admin/replay/demo-prepare?days=` (twin reset + bulk replay up
+to N days before the feed end, for a live demo).
 
 Feed and twin workflow (backend running, `local` profile):
 
@@ -296,6 +316,8 @@ Windows note: if `java -version` shows an old JRE, the shell's PATH predates the
       backend scenarios/runs/forecasts, docs/simulation.md.
 - [x] Step 6 — Spring AI scenario assistant and customer coach (tools, confirmation gate, guard, number check,
       audit, rate limit, SSE, PostgreSQL memory), goal simulation endpoint, docs/assistants.md, eval set.
+- [x] Step 7 — web UI (analyst + customer screens, chats with SSE, live feed, time travel), endpoints for it,
+      `ai-demo` profile, Swagger UI, start-all/stop-all, setup-fresh for new machines. Leftovers: docs/progress.md.
 - [ ] Run `scripts/ai_eval.py` with a real model and record the results in docs/assistants.md.
 - [ ] Publish `TwinUpdated` events for downstream consumers (event-driven ml-service scoring instead of batch).
 - [ ] Model monitoring: scheduled PSI on live scores/features; reduce the twin warm-up drift
