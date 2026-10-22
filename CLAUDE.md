@@ -36,6 +36,10 @@ See [docs/architecture.md](docs/architecture.md) for the diagram and flows.
 - The synthetic data generator lives in the backend (`com.fintwin.generator`, `generate` profile) and also writes the
   `ground_truth` schema (hidden variables and labels). Models train on the public schema only and use
   `ground_truth.*` for labels/validation. Details and the current data report: [docs/data-generation.md](docs/data-generation.md).
+- The **core banking feed** (`com.fintwin.feed`) replays the generated data (public schema = core banking system)
+  to Kafka from a transactional-outbox table (`feed.outbox`). The **customer twin** (`com.fintwin.twin`) is fed only
+  by these events: event store, projection, monthly snapshots, as-of and rebuild in the `twin` schema.
+  Design, event schemas and the feature dictionary: [docs/twin.md](docs/twin.md).
 - The frontend only talks to the backend; Vite proxies `/api` and `/actuator` in dev.
 - Kafka topic auto-creation is disabled; topics are declared explicitly (e.g. `NewTopic` beans).
   Naming: `fintwin.<domain>.<event>.v<N>`, e.g. `fintwin.transactions.recorded.v1`.
@@ -49,6 +53,12 @@ See [docs/architecture.md](docs/architecture.md) for the diagram and flows.
     common/dto/             shared DTOs (PageResponse)
     customer/ account/ loan/ merchant/ transaction/ macro/
                             retail banking domain features
+    events/                 Kafka event contracts: CoreBankingEvent, v1/ records, Topics, EventCodec
+    feed/                   core banking feed: outbox/ (prepare, cursor), publish/ (ReplayService, ReplayClock,
+                            EventAssembler), consistency/ (twin vs core balance check), controller/
+    twin/                   customer twin: consumer/ (batch listener, error handling), store/ (event store, state,
+                            snapshots), projection/ (pure TwinProjector, TwinFeatureCalculator, classifier),
+                            service/ (projection tx, queries/as-of, rebuild), controller/
     generator/              synthetic data generator (not a layered feature):
       simulation/             pure, deterministic day-by-day customer simulation + StressModel
       profile/ catalog/ calendar/ macro/ installment/ text/ rng/
@@ -65,7 +75,8 @@ See [docs/architecture.md](docs/architecture.md) for the diagram and flows.
     application.yml         shared config (default profile: local)
     application-local.yml   local dev, matches infra/docker-compose.yml
     application-generate.yml  generator settings (combine with local: profiles local,generate)
-    db/migration/           Flyway migrations V<N>__<description>.sql (V2 domain, V3 reference data, V4 ground truth)
+    db/migration/           Flyway migrations V<N>__<description>.sql (V2 domain, V3 reference data, V4 ground truth,
+                            V5 feed support columns, V6 feed outbox, V7 twin)
 /ml-service   FastAPI app
   app/main.py               app factory
   app/api/                  routers (one module per area)
@@ -74,8 +85,10 @@ See [docs/architecture.md](docs/architecture.md) for the diagram and flows.
 /frontend     Vite + React + TS
   src/api/                  typed API clients
   src/components/           components, tests colocated as *.test.tsx
-/infra        docker-compose.yml, .env.example
-/docs         architecture.md, data-generation.md (design + auto-generated report section)
+/infra        docker-compose.yml (Postgres tuned for bulk loads), .env.example
+/scripts      measure-twin.sh (clean timed end-to-end replay)
+/docs         architecture.md, data-generation.md, twin.md, progress.md (resume notes)
+/logs         output of long-running jobs (gitignored)
 ```
 
 ## Coding rules
@@ -99,7 +112,19 @@ Backend (Java)
   (shared JVM-wide singletons wired via `DynamicPropertyRegistrar`; do not turn them into beans — closing one cached
   context would stop them for the others). Docker must be running for `mvnw test`. Tests that write generated data
   must clean up (`JdbcBatchWriter.truncateGeneratedTables()`), the database is shared across test classes.
-- Bulk data goes through `JdbcTemplate.batchUpdate`, never JPA `saveAll`.
+- Bulk data goes through `JdbcTemplate.batchUpdate` (or `unnest` array inserts), never JPA `saveAll`.
+- The twin listener is disabled in the `test` profile (cached contexts would split the consumer group's partitions);
+  tests that need it enable it explicitly (`fintwin.twin.consumer.enabled=true`).
+
+Events and twin (Java)
+- **The twin never reads the public (core banking) schema or `ground_truth`**; only `com.fintwin.events` and the
+  `twin` schema. `TwinIsolationTests` enforces it. Cross-checks against core banking belong in `feed.consistency`.
+- Event records are immutable contracts: add optional fields only; anything else is a new `...V2` record on a new
+  `.v2` topic. Keep `eventId` deterministic (`EventCodec.eventId`) so republishing stays idempotent.
+- Customer events are applied in `customerSequence` order, never by arrival. The projection
+  (`TwinProjector`, `TwinFeatureCalculator`) must stay pure and deterministic and evaluate features at event time,
+  never wall-clock time — live projection, rebuild and as-of must agree exactly (rebuild `VERIFY` = 0 mismatches).
+- Do not publish label tables (`customer_event`) to the twin.
 
 Generator (Java, `com.fintwin.generator`)
 - **Determinism is a hard requirement**: same seed + settings ⇒ identical data. Draw randomness only from the
@@ -142,8 +167,25 @@ Make targets (need GNU make + POSIX shell; on Windows use Git Bash/WSL — or ru
 | All tests | `make test` | |
 
 Health checks: backend `http://localhost:8080/actuator/health`, ml-service `http://localhost:8000/health`,
-Kafka UI `http://localhost:8085`. Read API: `GET /api/customers/{id}`, `GET /api/customers/{id}/transactions?from=&to=`,
-`GET /api/macro-indicators?indicator=`.
+Kafka UI `http://localhost:8085`, metrics `http://localhost:8080/actuator/metrics` and `/actuator/prometheus`.
+Read API: `GET /api/customers/{id}`, `GET /api/customers/{id}/transactions?from=&to=`,
+`GET /api/macro-indicators?indicator=`. Twin API: `GET /api/twins/{id}[?asOf=]`, `/events?from=&to=`,
+`/history?feature=`.
+
+Feed and twin workflow (backend running, `local` profile):
+
+| Task | Command |
+|------|---------|
+| Build outbox | `curl -X POST localhost:8080/api/admin/replay/prepare` |
+| Bulk / live replay | `curl -X POST localhost:8080/api/admin/replay/bulk[?until=2025-06-30]` / `.../live?secondsPerDay=5` |
+| Replay status, stop, speed, rewind | `GET .../replay/status`, `POST .../replay/stop`, `.../speed?secondsPerDay=`, `.../reset` |
+| Twin vs core balances | `GET .../replay/consistency?sample=20` |
+| Rebuild twin | `curl -X POST "localhost:8080/api/admin/twins/rebuild?mode=VERIFY"` (or `REPLACE`) |
+| Wipe twin (after `make generate`) | `curl -X POST localhost:8080/api/admin/twins/reset` |
+| Clean timed measurement | `nohup scripts/measure-twin.sh > logs/measure-$(date +%Y%m%d-%H%M%S).log 2>&1 &` |
+
+Long-running jobs (bulk replay, rebuild, full test suite, generation) run detached with output in `logs/`; progress
+and resume notes are kept in [docs/progress.md](docs/progress.md).
 
 Generator overrides: `GENERATOR_CUSTOMERS`, `GENERATOR_MONTHS`, `GENERATOR_SEED`, `GENERATOR_END_MONTH`,
 `GENERATOR_RESET`, `GENERATOR_REPORT_PATH` (default 5000 / 24 / 42 / 2026-09 / true / `../docs/data-generation.md`).
@@ -163,4 +205,9 @@ Windows note: if `java -version` shows an old JRE, the shell's PATH predates the
       (`show-details: always` is local-only convenience).
 - [ ] Backend Dockerfile and adding backend/ml-service to compose.
 - [ ] TCMB EVDS ingestion to replace the seeded `macro_indicator` rows.
-- [ ] Replay generated transactions to Kafka (`fintwin.transactions.recorded.v1`) for the event-sourced twin.
+- [x] Step 3 — core banking feed (outbox, bulk/live replay) and Kafka-fed event-sourced customer twin (event store,
+      projection, snapshots/as-of, rebuild, idempotency, DLT, metrics, API), docs/twin.md.
+- [ ] Publish `TwinUpdated` events for downstream consumers (ml-service scoring).
+- [ ] Restrict `/api/admin/**` (replay, rebuild, reset) to an admin role once security lands.
+- [ ] Card limit history: the feed publishes the final credit limit only (the generator does not record changes).
+- [ ] Replace the twin's rule-based `TransactionClassifier` with the NLP categorisation model.
