@@ -1,9 +1,20 @@
 <!doctype html>
-<html lang="en">
+<html lang="tr">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FinTwin</title>
+    <meta name="theme-color" content="#0f1729" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>FinTwin — Portföy Dijital İkizi</title>
+    <script>
+      // Apply the saved theme before the first paint (no flash of the wrong theme).
+      try {
+        const t = localStorage.getItem('fintwin.theme');
+        if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark');
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,114 +1,182 @@
-:root {
-  --bg: #f6f7f9;
-  --surface: #ffffff;
-  --text: #1c2430;
-  --muted: #5b6676;
-  --border: #e1e5ea;
-  --up: #1f8f4e;
-  --down: #c0392b;
-  --unknown: #8a6d1f;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  color: var(--text);
-  background: var(--bg);
-}
+@import '@fontsource-variable/inter';
 
-@media (prefers-color-scheme: dark) {
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Design tokens (HSL components, consumed through tailwind.config.ts).
+ * Palette: ink-navy neutrals, a teal primary, semantic positive / negative / warning, and a 10-step risk scale
+ * from calm green (grade 1) to deep red (grade 10).
+ */
+@layer base {
   :root {
-    --bg: #12161c;
-    --surface: #1b2129;
-    --text: #e6eaef;
-    --muted: #9aa5b3;
-    --border: #2c3440;
+    --background: 214 33% 98%;
+    --foreground: 222 39% 13%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 39% 13%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 39% 13%;
+    --primary: 178 72% 30%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 214 32% 94%;
+    --secondary-foreground: 222 39% 18%;
+    --muted: 214 32% 95%;
+    --muted-foreground: 218 14% 44%;
+    --accent: 178 50% 93%;
+    --accent-foreground: 178 72% 22%;
+    --border: 216 26% 89%;
+    --input: 216 26% 86%;
+    --ring: 178 72% 34%;
+    --radius: 0.75rem;
+    --shadow: 222 47% 11%;
+
+    --sidebar: 223 45% 12%;
+    --sidebar-foreground: 214 33% 92%;
+    --sidebar-muted: 218 20% 62%;
+    --sidebar-accent: 222 38% 19%;
+
+    --positive: 152 62% 33%;
+    --positive-soft: 150 55% 93%;
+    --negative: 357 70% 48%;
+    --negative-soft: 356 80% 95%;
+    --warning: 34 92% 42%;
+    --warning-soft: 40 95% 92%;
+    --info: 213 80% 48%;
+    --info-soft: 213 90% 95%;
+
+    --chart-1: 178 72% 32%;
+    --chart-2: 213 80% 52%;
+    --chart-3: 34 92% 48%;
+    --chart-4: 280 52% 52%;
+    --chart-5: 357 70% 52%;
+    --chart-6: 152 50% 40%;
+
+    --grade-1: 152 58% 36%;
+    --grade-2: 145 52% 42%;
+    --grade-3: 120 38% 45%;
+    --grade-4: 84 48% 42%;
+    --grade-5: 52 80% 44%;
+    --grade-6: 40 90% 47%;
+    --grade-7: 28 88% 50%;
+    --grade-8: 16 80% 50%;
+    --grade-9: 2 72% 50%;
+    --grade-10: 352 70% 38%;
+  }
+
+  .dark {
+    --background: 224 44% 7%;
+    --foreground: 214 33% 93%;
+    --card: 223 40% 10%;
+    --card-foreground: 214 33% 93%;
+    --popover: 223 40% 11%;
+    --popover-foreground: 214 33% 93%;
+    --primary: 176 62% 45%;
+    --primary-foreground: 224 44% 7%;
+    --secondary: 222 30% 16%;
+    --secondary-foreground: 214 33% 90%;
+    --muted: 222 30% 15%;
+    --muted-foreground: 218 16% 64%;
+    --accent: 178 40% 16%;
+    --accent-foreground: 176 62% 70%;
+    --border: 222 26% 19%;
+    --input: 222 26% 22%;
+    --ring: 176 62% 45%;
+    --shadow: 0 0% 0%;
+
+    --sidebar: 225 48% 6%;
+    --sidebar-foreground: 214 33% 90%;
+    --sidebar-muted: 218 16% 56%;
+    --sidebar-accent: 223 38% 13%;
+
+    --positive: 150 55% 50%;
+    --positive-soft: 152 45% 14%;
+    --negative: 357 80% 64%;
+    --negative-soft: 357 45% 17%;
+    --warning: 38 92% 58%;
+    --warning-soft: 36 60% 15%;
+    --info: 213 90% 66%;
+    --info-soft: 213 50% 17%;
+
+    --chart-1: 176 62% 48%;
+    --chart-2: 213 90% 66%;
+    --chart-3: 38 92% 60%;
+    --chart-4: 280 60% 70%;
+    --chart-5: 357 80% 66%;
+    --chart-6: 150 50% 52%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::selection {
+    @apply bg-primary/20;
   }
 }
 
-body {
-  margin: 0;
-  background: var(--bg);
+@layer components {
+  .page-title {
+    @apply text-2xl font-semibold tracking-tight;
+  }
+
+  .section-title {
+    @apply text-sm font-semibold uppercase tracking-wide text-muted-foreground;
+  }
+
+  /* Markdown answers of the assistants. */
+  .prose-chat {
+    @apply text-sm leading-relaxed;
+  }
+  .prose-chat p {
+    @apply my-2 first:mt-0 last:mb-0;
+  }
+  .prose-chat ul,
+  .prose-chat ol {
+    @apply my-2 space-y-1 pl-5;
+  }
+  .prose-chat ul {
+    @apply list-disc;
+  }
+  .prose-chat ol {
+    @apply list-decimal;
+  }
+  .prose-chat strong {
+    @apply font-semibold;
+  }
+  .prose-chat em {
+    @apply text-muted-foreground;
+  }
+  .prose-chat table {
+    @apply my-3 w-full border-collapse text-xs;
+  }
+  .prose-chat th,
+  .prose-chat td {
+    @apply border border-border px-2 py-1 text-left;
+  }
+  .prose-chat th {
+    @apply bg-muted font-medium;
+  }
+  .prose-chat code {
+    @apply rounded bg-muted px-1 py-0.5 text-xs;
+  }
 }
 
-.container {
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 48px 16px;
-}
-
-.page-header h1 {
-  margin: 0 0 4px;
-}
-
-.page-header p {
-  margin: 0 0 24px;
-  color: var(--muted);
-}
-
-.card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 20px;
-}
-
-.card-header,
-.card-footer,
-.components li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.card-header h2 {
-  margin: 0;
-  font-size: 1.1rem;
-}
-
-.components {
-  list-style: none;
-  padding: 0;
-  margin: 16px 0;
-}
-
-.components li {
-  padding: 6px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.card-footer {
-  margin-top: 16px;
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-
-.badge {
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 999px;
-  color: #fff;
-  background: var(--unknown);
-}
-
-.badge-up {
-  background: var(--up);
-}
-
-.badge-down,
-.badge-unreachable,
-.badge-out_of_service {
-  background: var(--down);
-}
-
-.error {
-  color: var(--down);
-}
-
-button {
-  font: inherit;
-  padding: 4px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  cursor: pointer;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
