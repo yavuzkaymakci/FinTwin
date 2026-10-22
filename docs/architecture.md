@@ -22,7 +22,7 @@ flowchart LR
         FEED["Core banking feed<br/>outbox · bulk/live replay"]
         SIMO["Simulation orchestration<br/>scenarios · runs · forecasts"]
         RISK["Twin risk scoring"]
-        AI["Spring AI assistants (planned)<br/>scenario assistant · customer coach"]
+        AI["Spring AI assistants<br/>scenario assistant · customer coach"]
         MACRO["Macro data ingestion (planned)"]
         DOMAIN["Retail banking domain<br/>customers · accounts · loans · transactions"]
         GEN["Synthetic data generator<br/>(generate profile)"]
@@ -85,8 +85,10 @@ flowchart LR
    service reads the twin snapshot and macro history, runs the Monte Carlo paths and scores them with the PD /
    churn models → the backend polls, stores the portfolio results and per-customer forecasts
    ([simulation.md](simulation.md)).
-3. **Customer coaching** — customer asks the coach about a goal → assistant calls cash-flow forecast / simulation tools
-   for that single twin → answer includes SHAP-based explanation.
+3. **Assistants** — the scenario assistant turns an analyst's question into `createScenario` /
+   `startSimulation` (after explicit confirmation) / result tools; the customer coach answers from the
+   customer's own twin, cash-flow forecast and the ML service's goal simulation. Identity comes only from
+   `CurrentUser`; every request is audited ([assistants.md](assistants.md)).
 
 ## Event flow: core banking → twin
 
@@ -138,6 +140,10 @@ sequenceDiagram
   scenarios and stores results, because ML jobs are in memory only. Models are applied as log-odds shifts
   against a neutral reference projection so the point-in-time PD is not double counted.
 
+- Assistants run their own tool loop over Spring AI (internal tool execution off) so tool-call limits,
+  auditing, the confirmation gate and identity propagation (`ToolContext`) are under our control; the chat
+  provider is a profile (Anthropic Claude or a local Ollama model).
+
 ## Open decisions
 
-- LLM provider for Spring AI.
+- Default chat model for production (Anthropic vs a self-hosted model) once the evaluation has been run.

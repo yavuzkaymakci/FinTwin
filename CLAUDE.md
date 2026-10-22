@@ -41,6 +41,10 @@ See [docs/architecture.md](docs/architecture.md) for the diagram and flows.
   asynchronous in-memory jobs; the backend (`com.fintwin.simulation`) owns scenarios (V9 `simulation` schema,
   presets seeded), submits runs, polls the jobs and stores results and per-customer forecasts.
   Methodology, assumptions and back-test: [docs/simulation.md](docs/simulation.md).
+- The **assistants** (`com.fintwin.assistant`, Spring AI 1.1.8) are the scenario assistant (RISK_ANALYST) and
+  the customer coach (CUSTOMER). The chat provider is a profile: none (default, 503), `anthropic`
+  (`ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, default claude-sonnet-5-5) or `ollama` (`OLLAMA_MODEL`,
+  `OLLAMA_BASE_URL`). Tools, safety and evaluation: [docs/assistants.md](docs/assistants.md).
 - The synthetic data generator lives in the backend (`com.fintwin.generator`, `generate` profile) and also writes the
   `ground_truth` schema (hidden variables and labels). Models train on the public schema only and use
   `ground_truth.*` for labels/validation. Details and the current data report: [docs/data-generation.md](docs/data-generation.md).
@@ -70,6 +74,9 @@ See [docs/architecture.md](docs/architecture.md) for the diagram and flows.
                             risk/ (portfolio risk scoring, risk API)
     ml/                     shared ml-service client (RestClient + Resilience4j retry/circuit breaker), wire records
     simulation/             scenarios (CRUD, presets), runs (submit, poll, store), compare, customer forecasts
+    assistant/              Spring AI assistants: user/ (CurrentUser, demo header provider), core/ (engine with
+                            tool loop, guard, number check, rate limit, confirmation gate), scenario/ coach/
+                            (prompts + @Tool classes), service/, controller/ (chat + SSE), repository/ (audit)
     generator/              synthetic data generator (not a layered feature):
       simulation/             pure, deterministic day-by-day customer simulation + StressModel
       profile/ catalog/ calendar/ macro/ installment/ text/ rng/
@@ -88,7 +95,8 @@ See [docs/architecture.md](docs/architecture.md) for the diagram and flows.
     application-generate.yml  generator settings (combine with local: profiles local,generate)
     db/migration/           Flyway migrations V<N>__<description>.sql (V2 domain, V3 reference data, V4 ground truth,
                             V5 feed support columns, V6 feed outbox, V7 twin, V8 ML roles + risk scores,
-                            V9 simulation schema + preset scenarios)
+                            V9 simulation schema + preset scenarios, V10 assistant conversations, audit log and
+                            chat memory)
 /ml-service   FastAPI app
   app/main.py               app factory
   app/api/                  routers: models (active info), risk (score, batch, explain), categorize, simulations
@@ -106,8 +114,9 @@ See [docs/architecture.md](docs/architecture.md) for the diagram and flows.
   src/api/                  typed API clients
   src/components/           components, tests colocated as *.test.tsx
 /infra        docker-compose.yml (Postgres tuned for bulk loads), .env.example
-/scripts      measure-twin.sh (clean timed end-to-end replay)
-/docs         architecture.md, data-generation.md, twin.md, models.md, simulation.md, progress.md (resume notes)
+/scripts      measure-twin.sh (clean timed end-to-end replay), ai_eval.py (assistant evaluation, manual only)
+/docs         architecture.md, data-generation.md, twin.md, models.md, simulation.md, assistants.md,
+              ai-eval/ (Turkish question sets), progress.md (resume notes)
 /logs         output of long-running jobs (gitignored)
 ```
 
@@ -135,6 +144,14 @@ Backend (Java)
 - Bulk data goes through `JdbcTemplate.batchUpdate` (or `unnest` array inserts), never JPA `saveAll`.
 - The twin listener is disabled in the `test` profile (cached contexts would split the consumer group's partitions);
   tests that need it enable it explicitly (`fintwin.twin.consumer.enabled=true`).
+
+Assistants (Java, `com.fintwin.assistant`)
+- Tools take the caller's identity only from `TurnContext.of(toolContext).user()` (from `CurrentUserProvider`);
+  never add a customer-id parameter to a coach tool (`noCoachToolExposesACustomerIdParameter` enforces it).
+- Expensive or state-changing actions go through a confirmation gate like `ConfirmationStore` (token, later turn,
+  explicit user yes). Tool results are compact JSON; every number an answer may cite must be in them.
+- Tests never call a real LLM: use `ScriptedChatModel` (scripted text / tool-call steps). The real-model
+  evaluation is `scripts/ai_eval.py`, manual only; never commit API keys.
 
 Events and twin (Java)
 - **The twin never reads the public (core banking) schema or `ground_truth`**; only `com.fintwin.events` and the
@@ -199,6 +216,8 @@ Make targets (need GNU make + POSIX shell; on Windows use Git Bash/WSL — or ru
 | PD vs hidden stress evaluation | `make ml-evaluate` | `python -m app.evaluation.stress_relationship` |
 | Active model summary | | `cd ml-service && .venv/Scripts/python -m app.training.summary` |
 | Simulation back-test (background) | `make ml-backtest` | `python -m app.simulation.backtest --start 2025-09-01 --paths 200` |
+| Backend with a chat model | | `SPRING_PROFILES_ACTIVE=local,anthropic ./mvnw spring-boot:run` (needs `ANTHROPIC_API_KEY`) or `local,ollama` |
+| Assistant evaluation (manual, real LLM) | | `python scripts/ai_eval.py --run-a <BASE run> --run-b <shock run>` |
 | Preset scenarios (background) | `make ml-presets` | `python -m app.simulation.run_presets [--start 2026-10-01]` |
 | Install frontend | `make frontend-install` | `cd frontend && npm install` |
 | Run frontend | `make frontend-run` | `cd frontend && npm run dev` |
@@ -216,7 +235,9 @@ Read API: `GET /api/customers/{id}`, `GET /api/customers/{id}/transactions?from=
 Simulation API: `GET/POST /api/scenarios`, `PUT/DELETE /api/scenarios/{id}` (presets read-only),
 `POST /api/scenarios/{id}/run` (202; body optional: `startDate`, `baselineScenarioId`, `assumptions`,
 `topCustomers`), `GET /api/simulation-runs/{id}`, `/api/simulation-runs/compare?ids=1,2`,
-`GET /api/twins/{id}/forecast[?runId=]`.
+`GET /api/twins/{id}/forecast[?runId=]`. Assistants: `POST /api/assistants/scenario/chat`,
+`/api/assistants/coach/chat` (`{conversationId?, message}`; headers `X-Demo-User`, `X-Demo-Role`,
+`X-Demo-Customer-Id` until step 7) and `/chat/stream` (SSE). ml-service: `POST /v1/goals/simulate`.
 
 Feed and twin workflow (backend running, `local` profile):
 
@@ -273,6 +294,9 @@ Windows note: if `java -version` shows an old JRE, the shell's PATH predates the
 - [x] Step 5 — simulation engine (scenario schema, vectorised Monte Carlo projection, reference-anchored
       PD/churn hazards, EL/P99, segments, migration, top customers, cash-flow bands), back-test, async jobs,
       backend scenarios/runs/forecasts, docs/simulation.md.
+- [x] Step 6 — Spring AI scenario assistant and customer coach (tools, confirmation gate, guard, number check,
+      audit, rate limit, SSE, PostgreSQL memory), goal simulation endpoint, docs/assistants.md, eval set.
+- [ ] Run `scripts/ai_eval.py` with a real model and record the results in docs/assistants.md.
 - [ ] Publish `TwinUpdated` events for downstream consumers (event-driven ml-service scoring instead of batch).
 - [ ] Model monitoring: scheduled PSI on live scores/features; reduce the twin warm-up drift
       (`salary_day_deviation`, `income_cv`) or start observation months later.

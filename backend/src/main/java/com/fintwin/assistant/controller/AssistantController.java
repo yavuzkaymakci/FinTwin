@@ -1,6 +1,7 @@
 package com.fintwin.assistant.controller;
 
 import com.fintwin.assistant.core.AssistantEngine;
+import com.fintwin.assistant.core.AssistantExceptions;
 import com.fintwin.assistant.core.AssistantType;
 import com.fintwin.assistant.dto.ChatAnswer;
 import com.fintwin.assistant.dto.ChatRequest;
@@ -8,10 +9,13 @@ import com.fintwin.assistant.service.AssistantService;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -87,6 +91,24 @@ public class AssistantController {
             }
         });
         return emitter;
+    }
+
+    @ExceptionHandler(AssistantExceptions.NotConfigured.class)
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    public Map<String, String> notConfigured(AssistantExceptions.NotConfigured e) {
+        return Map.of("error", "ASSISTANT_NOT_CONFIGURED", "detail", e.getMessage());
+    }
+
+    @ExceptionHandler(AssistantExceptions.ModelFailed.class)
+    @ResponseStatus(HttpStatus.BAD_GATEWAY)
+    public Map<String, String> modelFailed(AssistantExceptions.ModelFailed e) {
+        return Map.of("error", "MODEL_CALL_FAILED", "detail", e.getMessage());
+    }
+
+    @ExceptionHandler(AssistantExceptions.RateLimited.class)
+    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
+    public Map<String, String> rateLimited(AssistantExceptions.RateLimited e) {
+        return Map.of("error", "RATE_LIMITED", "detail", e.getMessage());
     }
 
     private static void send(SseEmitter emitter, String event, Object data) {

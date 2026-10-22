@@ -3,6 +3,24 @@
 Short working notes so an interrupted session can resume. Newest first. Long-running jobs write to `logs/`
 (gitignored); read the log to see how a job ended.
 
+## Step 6 — Spring AI assistants
+
+Done:
+- 033f2cc ml-service `POST /v1/goals/simulate` (savings goal on the twin, extra saving, category cuts, required
+  saving for 80 %); 77 pytest green.
+- 5603b87 backend `com.fintwin.assistant`: Spring AI 1.1.8 (Boot 3.5 line), own tool loop, CurrentUser via
+  ToolContext, confirmation gate, input guard, number check, rate limit, audit (V10), PostgreSQL memory, SSE;
+  21 assistant tests with a scripted chat model.
+- Live checks without a model: 401 / 403 / 503 `ASSISTANT_NOT_CONFIGURED`, guard refusals + SSE + audit rows;
+  `ollama` profile without a server: 502 `MODEL_CALL_FAILED` in 1.2 s after bounding Spring AI's retry (it
+  hung for minutes with the default 10 attempts).
+- docs/assistants.md, docs/ai-eval/ (14 + 9 Turkish questions), scripts/ai_eval.py (manual; skips without key).
+
+- Final runs: backend 166/166 (`logs/test-step6-20261022-122643.log`), pytest 77/77.
+
+Not done: the real-LLM evaluation (no ANTHROPIC_API_KEY / Ollama on this machine) — see docs/assistants.md
+"Evaluation" for how to run it.
+
 ## Step 5 — simulation engine
 
 Done:

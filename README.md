@@ -9,14 +9,14 @@ built on Spring AI run scenarios from natural language and coach customers on th
 Macro data comes from the Central Bank of the Republic of Türkiye (TCMB EVDS); customer and transaction data is
 synthetic.
 
-> Status: retail banking domain model and deterministic synthetic data generator in place; models, twins and
-> simulation are next.
+> Status: domain model, synthetic data, Kafka-fed twins, PD / churn / categorisation models, the simulation
+> engine and the two Spring AI assistants are in place; security (JWT) and the frontend are next.
 
 ## Stack
 
 | Part | Tech |
 |------|------|
-| `backend/` | Java 21, Spring Boot 3, Spring Data JPA, Spring Security, Flyway, Spring Kafka |
+| `backend/` | Java 21, Spring Boot 3.5, Spring Data JPA, Spring Security, Flyway, Spring Kafka, Spring AI 1.1 |
 | `ml-service/` | Python 3.11, FastAPI |
 | `frontend/` | React, TypeScript, Vite |
 | `infra/` | Docker Compose: PostgreSQL 16, Kafka (KRaft), Kafka UI |
@@ -56,6 +56,28 @@ Kafka UI is available at http://localhost:8085. How the data is generated and wh
 [docs/data-generation.md](docs/data-generation.md). Stop the infrastructure with `make down`.
 
 Without make, see the command table in [CLAUDE.md](CLAUDE.md#development-commands).
+
+## AI assistants
+
+The scenario assistant (risk analysts) and the customer coach answer in Turkish through Spring AI. The chat
+model is chosen with a profile; without one the assistant endpoints answer 503.
+
+```bash
+# Anthropic Claude: the key comes from the environment only, never from a file in the repository
+export ANTHROPIC_API_KEY=sk-ant-...          # optional: export ANTHROPIC_MODEL=claude-sonnet-5-5
+cd backend && SPRING_PROFILES_ACTIVE=local,anthropic ./mvnw spring-boot:run
+
+# or a local Ollama model with tool calling
+ollama pull qwen2.5:7b-instruct
+cd backend && SPRING_PROFILES_ACTIVE=local,ollama ./mvnw spring-boot:run   # OLLAMA_MODEL / OLLAMA_BASE_URL
+
+# chat (development identity headers until JWT arrives in step 7)
+curl -X POST localhost:8080/api/assistants/coach/chat -H 'Content-Type: application/json' \
+  -H 'X-Demo-User: alice' -H 'X-Demo-Role: CUSTOMER' -H 'X-Demo-Customer-Id: 6' \
+  --data-binary @question.json     # {"message": "3 yılda 500 bin TL biriktirebilir miyim?"}
+```
+
+Tools, safety measures and the evaluation (`python scripts/ai_eval.py`): [docs/assistants.md](docs/assistants.md).
 
 ## Tests
 

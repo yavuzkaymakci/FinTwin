@@ -41,6 +41,13 @@ spring:
       # "anthropic" and "ollama" set it; see CLAUDE.md / docs/assistants.md.
       chat: none
       embedding: none
+    # Spring AI's own retry of model calls (default 10 attempts with minutes of back-off): keep a chat request short.
+    retry:
+      max-attempts: 2
+      backoff:
+        initial-interval: 1s
+        multiplier: 2
+        max-interval: 4s
     chat:
       memory:
         repository:
