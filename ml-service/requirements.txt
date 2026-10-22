@@ -1,2 +1,15 @@
 fastapi==0.115.6
 uvicorn[standard]==0.32.1
+# Data and models
+numpy==2.0.2
+pandas==2.2.3
+pyarrow==18.1.0
+scikit-learn==1.5.2
+lightgbm==4.5.0
+shap==0.46.0
+numba==0.60.0
+llvmlite==0.43.0
+scipy==1.17.1
+joblib==1.4.2
+# Database (read-only roles fintwin_ml / fintwin_ml_labels)
+psycopg[binary]==3.2.3
