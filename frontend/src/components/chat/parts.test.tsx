@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { ToolCall } from '@/api/types';
 import { renderWithProviders } from '@/test/render';
-import { ConfirmationCard, GoalCard, pendingConfirmation, RunLinks, ToolTag, ValidationWarning } from './parts';
+import { ConfirmationCard, GoalCard, inflationText, pendingConfirmation, RunLinks, ToolTag, ValidationWarning } from './parts';
 
 const call = (name: string, result: unknown, args = '{}'): ToolCall => ({ name, arguments: args,
   result: JSON.stringify(result), ok: true, durationMs: 12 });
@@ -35,6 +35,13 @@ describe('ConfirmationCard', () => {
     await userEvent.click(screen.getByRole('button', { name: /Vazgeç/ }));
     expect(onConfirm).toHaveBeenCalledOnce();
     expect(onCancel).toHaveBeenCalledOnce();
+  });
+});
+
+describe('inflationText', () => {
+  it('folds repeated months', () => {
+    expect(inflationText([4, 4, 4, 3])).toBe('%4,0 × 3 · %3,0');
+    expect(inflationText([])).toBe('–');
   });
 });
 

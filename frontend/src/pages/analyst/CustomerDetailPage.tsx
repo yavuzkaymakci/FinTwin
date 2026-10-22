@@ -75,8 +75,8 @@ function FeatureCards({ twin, current }: { twin: TwinView; current?: TwinView })
             </div>
             <div className="mt-1 text-lg font-semibold tracking-tight">{spec.format(value)}</div>
             {comparing && value !== null && now !== null && (
-              <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                bugün {spec.format(now)}
+              <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-muted-foreground">
+                <span className="whitespace-nowrap">bugün {spec.format(now)}</span>
                 <DeltaBadge value={now - value} format={spec.delta} higherIsWorse={spec.higherIsWorse} />
               </div>
             )}
@@ -119,7 +119,7 @@ function RiskCard({ customerId }: { customerId: number }) {
   });
   const r = risk.data;
   return (
-    <Card className="h-full">
+    <Card>
       <CardHeader className="flex-row items-start justify-between space-y-0">
         <div>
           <CardTitle>Risk skoru</CardTitle>

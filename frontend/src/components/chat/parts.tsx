@@ -94,6 +94,18 @@ export function pendingConfirmation(calls: ToolCall[] | null | undefined): Pendi
   return pending;
 }
 
+/** Monthly inflation path with repeats folded: [4, 4, 4, 3] -> "%4,0 × 3 · %3,0". */
+export function inflationText(values: number[]): string {
+  if (!values.length) return '–';
+  const runs: { value: number; count: number }[] = [];
+  values.forEach((v) => {
+    const last = runs[runs.length - 1];
+    if (last && last.value === v) last.count++;
+    else runs.push({ value: v, count: 1 });
+  });
+  return runs.map((r) => `%${formatNumber(r.value, 1)}${r.count > 1 ? ` × ${r.count}` : ''}`).join(' · ');
+}
+
 export function ConfirmationCard({ pending, onConfirm, onCancel, disabled }: {
   pending: PendingConfirmation; onConfirm: () => void; onCancel: () => void; disabled?: boolean;
 }) {
@@ -102,7 +114,7 @@ export function ConfirmationCard({ pending, onConfirm, onCancel, disabled }: {
   const rows: [string, string][] = [
     ['USD/TRY', `%${formatNumber(Number(p.usdTryChangePct ?? 0), 1)}`],
     ['Politika faizi', `${formatNumber(Number(p.policyRateChangeBp ?? 0))} bp`],
-    ['Aylık enflasyon', inflation.map((v) => `%${formatNumber(v, 1)}`).join(' · ') || '–'],
+    ['Aylık enflasyon', inflationText(inflation)],
     ['Ücret', `%${formatNumber(Number(p.wageIndexationPct ?? 0))} / ${String(p.wageAdjustmentLagMonths ?? '–')} ay`],
     ['Ufuk / yol', `${String(p.horizonMonths ?? '–')} ay · ${String(p.monteCarloPaths ?? '–')} yol`],
   ];
