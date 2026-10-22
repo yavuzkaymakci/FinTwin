@@ -3,6 +3,47 @@
 Short working notes so an interrupted session can resume. Newest first. Long-running jobs write to `logs/`
 (gitignored); read the log to see how a job ended.
 
+## Migration to a new machine (Taşıma)
+
+First thing on the new Windows machine: follow [setup.md](setup.md) and run `scripts\setup-fresh.bat`
+(`--check` first). It has only been syntax- and prerequisite-checked here (`--check` passes; the Docker-not-running
+path prints its message); the full fresh run was deliberately **not** executed on this machine (it would wipe the
+database). Expect to fix small issues on the first real run — read `logs\setup-<step>.log` of the failing step,
+fix, re-run (finished steps are skipped). Then look at `logs\setup-check.log`: table counts and twin numbers must
+match [reproducibility.json](reproducibility.json) exactly; models and presets within the tolerances.
+Afterwards refresh the references there with `setup_steps.py snapshot` if this machine's approximations differ
+(the sample balance was read rounded from the UI, see reproducibility.md).
+
+Things to watch on the first run: Java 21 first in PATH / `JAVA_HOME`; Docker Desktop running and not paused;
+Maven wrapper download (needs internet); `py` vs `python`; ports 8080/8000 free; memory (`.wslconfig`).
+
+## Step 7 — remaining items (Adım 7 - kalanlar)
+
+Done (commits): aab9800 endpoints + ai-demo + Swagger, 4812be5 recent runs, 027a210 web UI, a312e33 layout
+fixes, 0cfcf70 live view index (V11; `/api/live/twin` 14 s → 25 ms), 8f13173 start-all/stop-all, then
+setup-fresh + docs. Frontend: Vitest 23/23, `npm run build` OK. Playwright check of all screens in light and dark
+(`playwright-core` + installed Chrome, outside the repo): no console errors, no failed API calls, no horizontal
+overflow on 390 px; 22 screenshots in docs/screenshots/.
+
+Remaining (no more design work was done on purpose):
+- Screenshots `03-customer-twin` and `04-customer-time-travel` (light/dark) are missing: they were retaken after
+  the layout fix while the dev server had stopped. Retake with all services up.
+- Full backend suite not re-run after the step-7 backend changes (targeted tests passed: PortfolioEndpoints,
+  DemoChatModel, DemoPrepareService, TwinIsolation, ScenarioAssistant, CoachAssistant, TwinLiveService,
+  SimulationService compile). Run it with compose stopped, in the background (`logs/`).
+- Live page: "Demo için hazırla" (twin reset + bulk replay up to N days before the end, ~7 min) and a live replay
+  driven from the UI were not exercised end to end in this session.
+- Chats only verified with the `ai-demo` profile; no real LLM (no key on this machine).
+- Bundle is one ~1 MB chunk: split routes with `React.lazy`.
+- Cosmetic: full-page screenshots show the sticky sidebar only at the top; very long chat answers push the
+  confirmation card below the fold; the customer list has no column for churn trend; dark-mode chart grid could
+  be softer.
+- `docker compose up` recreated the postgres container on start-all (data volume kept) — find out which config
+  difference triggers it.
+- Vite listens on `localhost` (`::1` here); set `server.host` if another device must reach it.
+- Security (step 8): role guard is UI-only; the backend still trusts the demo headers and `/api/admin/**` is open.
+- The screenshot run created a few `DEMO_*` scenarios and conversations in the database (assistant demo).
+
 ## Step 6 — Spring AI assistants
 
 Done:

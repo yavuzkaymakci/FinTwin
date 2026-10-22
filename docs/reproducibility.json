@@ -1,0 +1,53 @@
+{
+  "_about": "Reference values of the development machine (2026-10-22, seed 42, 5,000 customers x 24 months). Read by scripts/setup_steps.py check; explained in docs/reproducibility.md. Tolerances: below 1 = relative, 1 or more = absolute; prefixes match value paths.",
+  "tolerances": {
+    "sampleCustomer.checkingBalance": 1.0,
+    "sampleCustomer.pd": 0.02,
+    "portfolio.meanPd": 0.02,
+    "portfolio.highRiskCustomers": 0.05,
+    "models": 0.01,
+    "presets": 0.05
+  },
+  "values": {
+    "tables": {
+      "customer": 5000,
+      "account": 11247,
+      "card_statement": 71427,
+      "loan": 2178,
+      "loan_installment": 57048,
+      "bank_transaction": 5568659,
+      "customer_event": 4687,
+      "merchant": 1164,
+      "ground_truth.customer_monthly_state": 104077
+    },
+    "twin": {
+      "twins": 5000,
+      "snapshots": 99693,
+      "events": 5688485
+    },
+    "sampleCustomer": {
+      "customerId": 6,
+      "lastSequence": 980,
+      "checkingBalance": 92682,
+      "pd": 0.0140,
+      "riskGrade": 5
+    },
+    "portfolio": {
+      "scoredCustomers": 4383,
+      "meanPd": 0.0135,
+      "highRiskCustomers": 171
+    },
+    "models": {
+      "pd": { "auc": 0.9723, "gini": 0.9446, "ks": 0.8452, "brier": 0.01275 },
+      "churn": { "auc": 0.7610, "gini": 0.5219, "ks": 0.3641, "brier": 0.02547 },
+      "nlp": { "macroF1": 0.9554 }
+    },
+    "presets": {
+      "BASE": { "defaultRate": 0.0323, "expectedLoss": 5710000 },
+      "FX_SHOCK": { "defaultRate": 0.0421, "expectedLoss": 8010000 },
+      "RATE_SHOCK": { "defaultRate": 0.0338, "expectedLoss": 6020000 },
+      "STAGFLATION": { "defaultRate": 0.0472, "expectedLoss": 9750000 },
+      "RECOVERY": { "defaultRate": 0.0292, "expectedLoss": 5020000 }
+    }
+  }
+}

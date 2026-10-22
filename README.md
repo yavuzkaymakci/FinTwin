@@ -31,6 +31,12 @@ Architecture: [docs/architecture.md](docs/architecture.md).
 - Node.js 20+
 - Optional: GNU make (on Windows via Git Bash or WSL)
 
+## New machine
+
+Installing on a fresh Windows machine (WSL 2, Docker Desktop, JDK 21, Node, Python, memory settings) and
+rebuilding the data set, twins, models and scenario results with one script, `scripts\setup-fresh.bat`:
+[docs/setup.md](docs/setup.md). Reference values for checking the result: [docs/reproducibility.md](docs/reproducibility.md).
+
 ## One-click start on Windows
 
 From `cmd` (no PowerShell needed), after the one-time setup below (data generated, `ml-service\.venv` created,
@@ -61,6 +67,8 @@ headers in one place (`frontend/src/auth/identity.ts`) until JWT replaces them.
   twin, risk reasons, feature history, cash-flow fan chart), scenarios and runs (results, comparison), scenario
   assistant chat, live feed, system and models.
 - Customer: own summary (balances, spending, forecast) and the finance coach chat with goal cards.
+
+Screenshots (light and dark): [docs/screenshots/](docs/screenshots/).
 
 ## Running locally
 
