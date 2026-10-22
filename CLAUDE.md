@@ -32,7 +32,11 @@ See [docs/architecture.md](docs/architecture.md) for the diagram and flows.
 | kafka | Confluent cp-kafka 7.9, KRaft single node, no ZooKeeper (Docker) | 9092 (host), 29092 (in-network) |
 | kafka-ui | kafbat/kafka-ui (Docker) | 8085 |
 
-- The backend is the system of record and owns the database schema (Flyway). The ml-service is stateless compute.
+- The backend is the system of record and owns the database schema (Flyway). The ml-service trains offline from
+  the database with read-only roles (`fintwin_ml`: twin + public, **no** `ground_truth`; `fintwin_ml_labels`:
+  ground truth for label export/evaluation only, V8) and serves scoring statelessly from versioned artifacts. The
+  backend (`com.fintwin.twin.risk`) calls it and stores scores in `twin.customer_risk_score`.
+  Model cards and metrics: [docs/models.md](docs/models.md).
 - The synthetic data generator lives in the backend (`com.fintwin.generator`, `generate` profile) and also writes the
   `ground_truth` schema (hidden variables and labels). Models train on the public schema only and use
   `ground_truth.*` for labels/validation. Details and the current data report: [docs/data-generation.md](docs/data-generation.md).
@@ -58,7 +62,8 @@ See [docs/architecture.md](docs/architecture.md) for the diagram and flows.
                             EventAssembler), consistency/ (twin vs core balance check), controller/
     twin/                   customer twin: consumer/ (batch listener, error handling), store/ (event store, state,
                             snapshots), projection/ (pure TwinProjector, TwinFeatureCalculator, classifier),
-                            service/ (projection tx, queries/as-of, rebuild), controller/
+                            service/ (projection tx, queries/as-of, rebuild), controller/,
+                            risk/ (ml-service client with Resilience4j, portfolio scoring, risk API)
     generator/              synthetic data generator (not a layered feature):
       simulation/             pure, deterministic day-by-day customer simulation + StressModel
       profile/ catalog/ calendar/ macro/ installment/ text/ rng/
@@ -76,12 +81,18 @@ See [docs/architecture.md](docs/architecture.md) for the diagram and flows.
     application-local.yml   local dev, matches infra/docker-compose.yml
     application-generate.yml  generator settings (combine with local: profiles local,generate)
     db/migration/           Flyway migrations V<N>__<description>.sql (V2 domain, V3 reference data, V4 ground truth,
-                            V5 feed support columns, V6 feed outbox, V7 twin)
+                            V5 feed support columns, V6 feed outbox, V7 twin, V8 ML roles + risk scores)
 /ml-service   FastAPI app
   app/main.py               app factory
-  app/api/                  routers (one module per area)
-  app/<area>/               models, simulation, generator, ...
-  tests/                    pytest
+  app/api/                  routers: models (active info), risk (score, batch, explain), categorize
+  app/db.py features.py grades.py   read-only DB access, feature engineering (EN/TR labels), master scale
+  app/training/             dataset (point-in-time rows + 6-month labels), splits, metrics, risk_model,
+                            train_risk / train_nlp CLIs, rules (port of the Java classifier), summary
+  app/models/               feature matrix, artifact classes, registry (artifacts/models/<name>/<version>/)
+  app/scoring/              risk scorer, SHAP reason texts, model loading for the API
+  app/labeling/ app/evaluation/   the ONLY code that may read ground_truth (label export, PD vs hidden stress)
+  artifacts/                models, label parquet, reports (gitignored; ML_ARTIFACTS_DIR)
+  tests/                    pytest (DB tests skip when PostgreSQL is unreachable)
 /frontend     Vite + React + TS
   src/api/                  typed API clients
   src/components/           components, tests colocated as *.test.tsx
@@ -140,7 +151,15 @@ ML service (Python)
 - Type hints everywhere; Pydantic models for request/response schemas.
 - Keep routers thin; put logic in `app/<area>/` modules.
 - Lint with `ruff`, test with `pytest`. Pin dependencies in `requirements*.txt`.
-- Model artifacts are not committed (`ml-service/artifacts/` is gitignored).
+- Model artifacts are not committed (`ml-service/artifacts/` is gitignored). Every version has a `metadata.json`
+  (training date, data periods, features, params, metrics); `active.json` selects the served versions.
+- **`ground_truth` never feeds training or features.** Only `app/labeling/` and `app/evaluation/` may mention it
+  (with `ML_LABELS_DB_URL`); nothing else may import them. `test_ground_truth_isolation.py` enforces it, and the
+  `fintwin_ml` role has no privileges there. NLP labels come from the exported parquet (stand-in for hand labels).
+- PD/churn rows are point-in-time (`twin.customer_twin_snapshot` at month start); labels use a 6-month window and
+  rows with incomplete windows are dropped. Validate out-of-time (train → validation → test by observation month).
+- Monetary features enter as ratios to income (inflation-neutral); add new features to `FEATURE_SPECS` with
+  EN/TR texts so reasons stay readable.
 
 Frontend (TypeScript)
 - Strict TypeScript; no `any`.
@@ -161,6 +180,10 @@ Make targets (need GNU make + POSIX shell; on Windows use Git Bash/WSL — or ru
 | Install ML deps | `make ml-install` | `cd ml-service && python -m venv .venv && .venv/Scripts/python -m pip install -r requirements-dev.txt` |
 | Run ML service | `make ml-run` | `cd ml-service && .venv/Scripts/python -m uvicorn app.main:app --reload --port 8000` |
 | Test ML service | `make ml-test` | `cd ml-service && .venv/Scripts/python -m pytest` |
+| Export NLP labels (once per data set) | `make ml-export-labels` | `cd ml-service && .venv/Scripts/python -m app.labeling.export_transaction_labels` |
+| Train PD + churn / NLP | `make ml-train` / `make ml-train-nlp` | `python -m app.training.train_risk --target pd\|churn --activate`, `python -m app.training.train_nlp --activate` |
+| PD vs hidden stress evaluation | `make ml-evaluate` | `python -m app.evaluation.stress_relationship` |
+| Active model summary | | `cd ml-service && .venv/Scripts/python -m app.training.summary` |
 | Install frontend | `make frontend-install` | `cd frontend && npm install` |
 | Run frontend | `make frontend-run` | `cd frontend && npm run dev` |
 | Test / build frontend | `make frontend-test` / `make frontend-build` | `npm test` / `npm run build` |
@@ -170,7 +193,9 @@ Health checks: backend `http://localhost:8080/actuator/health`, ml-service `http
 Kafka UI `http://localhost:8085`, metrics `http://localhost:8080/actuator/metrics` and `/actuator/prometheus`.
 Read API: `GET /api/customers/{id}`, `GET /api/customers/{id}/transactions?from=&to=`,
 `GET /api/macro-indicators?indicator=`. Twin API: `GET /api/twins/{id}[?asOf=]`, `/events?from=&to=`,
-`/history?feature=`.
+`/history?feature=`, `GET /api/twins/{id}/risk[?refresh=true]`. Risk scoring: `POST /api/admin/risk/score-portfolio`,
+`GET /api/admin/risk/status` (needs ml-service; outages return 503 `ML_SERVICE_UNAVAILABLE`). ml-service:
+`GET /v1/models/active`, `POST /v1/risk/score`, `/v1/risk/score/batch`, `/v1/risk/explain`, `POST /v1/categorize`.
 
 Feed and twin workflow (backend running, `local` profile):
 
@@ -200,6 +225,7 @@ Memory budget (16 GB laptop, WSL2 capped at 6 GB + 4 GB swap) — keep these lim
 | Testcontainers Postgres / Kafka | 768 MB each, Kafka `KAFKA_HEAP_OPTS=-Xms256m -Xmx512m` | `TestcontainersConfiguration` |
 | App via `spring-boot:run` | `-Xmx1536m` | spring-boot-maven-plugin `jvmArguments` |
 | Compose Postgres / Kafka / Kafka UI | 1.5 GB / 1.5 GB (`-Xmx1g`) / 512 MB (`-Xmx256m`) | `infra/docker-compose.yml` |
+| ML training (one job at a time, background) | NLP ~0.5 GB peak RSS (12k labels per category); PD/churn ~100k rows × 22 features, LightGBM `n_jobs=2` | `app/training/` |
 
 Stop the compose stack before `mvnw test` (`docker compose -f infra/docker-compose.yml stop`; tests use their own
 containers) and start it again afterwards; never run the test suite and a replay/generation at the same time.
@@ -220,7 +246,11 @@ Windows note: if `java -version` shows an old JRE, the shell's PATH predates the
 - [ ] TCMB EVDS ingestion to replace the seeded `macro_indicator` rows.
 - [x] Step 3 — core banking feed (outbox, bulk/live replay) and Kafka-fed event-sourced customer twin (event store,
       projection, snapshots/as-of, rebuild, idempotency, DLT, metrics, API), docs/twin.md.
-- [ ] Publish `TwinUpdated` events for downstream consumers (ml-service scoring).
+- [x] Step 4 — PD/churn (LightGBM vs LR, out-of-time, calibration, grades, SHAP reasons), NLP categorisation,
+      model registry and FastAPI serving, backend risk scoring with retry/circuit breaker, docs/models.md.
+- [ ] Publish `TwinUpdated` events for downstream consumers (event-driven ml-service scoring instead of batch).
+- [ ] Model monitoring: scheduled PSI on live scores/features; reduce the twin warm-up drift
+      (`salary_day_deviation`, `income_cv`) or start observation months later.
 - [ ] Restrict `/api/admin/**` (replay, rebuild, reset) to an admin role once security lands.
 - [ ] Card limit history: the feed publishes the final credit limit only (the generator does not record changes).
 - [ ] Replace the twin's rule-based `TransactionClassifier` with the NLP categorisation model.

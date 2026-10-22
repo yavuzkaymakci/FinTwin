@@ -13,8 +13,17 @@ Done:
   0.722) vs rules 0.831 with MCC / 0.196 text only. Stress evaluation: Spearman(PD, hidden stress) 0.63.
 - FastAPI: /v1/models/active, /v1/risk/score(/batch), /v1/risk/explain, /v1/categorize; 38 pytest green.
 
-Next: backend `com.fintwin.twin.risk` (RestClient + Resilience4j, batch scoring, /api/twins/{id}/risk), then
-docs/models.md, CLAUDE.md, final test runs.
+- 9f4a53f: backend `com.fintwin.twin.risk` (RestClient + Resilience4j retry/circuit breaker, portfolio batch
+  scoring, `/api/twins/{id}/risk`); 15 new tests (MockRestServiceServer, Testcontainers, WebMvc) green.
+- 2026-10-22 live check: 5,000 twins scored in 3.9 s; customer 6 PD 1.40 % grade 5 (reasons in
+  `logs/sample-backend-risk.json`); with ml-service stopped: 503 `ML_SERVICE_UNAVAILABLE`, circuit opens after
+  the first retried failures (then 503 in ~5 ms), stored scores still served, backend health UP.
+- docs/models.md (model cards), CLAUDE.md, Makefile targets `ml-export-labels ml-train ml-train-nlp ml-evaluate`.
+
+- Final runs: pytest 38/38 + ruff clean (`logs/pytest-*.log`), backend 130/130 (`logs/test-20261022-100733.log`).
+
+**Step 4 complete.** Next candidates: `TwinUpdated` events for event-driven scoring, NLP model in the twin,
+security for `/api/admin/**`, model monitoring (PSI).
 
 Re-create artifacts (gitignored) after a fresh checkout: `make ml-export-labels ml-train ml-train-nlp ml-evaluate`.
 
