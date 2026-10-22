@@ -18,8 +18,12 @@ Done (committed):
 - 2026-10-22: verification (`logs/verify-20261022-083849.log`): rebuild VERIFY/REPLACE 0 mismatches, identical
   checksums; 11,247/11,247 accounts match; 20 random customers OK; as-of 15/15 OK. Results in docs/twin.md.
 
-In progress:
-- Final full test suite (`logs/test-*.log`), then final commit. Step 3 is otherwise complete.
+- 2026-10-22: the previous test run crashed the laptop (memory). Bounded all JVM heaps and container memory (see
+  CLAUDE.md "Memory budget"), stopped the compose stack during tests: full suite 115/115 green in 52 s
+  (`logs/test-20261022-091922.log`).
+
+**Step 3 complete.** Next candidates (see CLAUDE.md TODOs): role-based security for `/api/admin/**`,
+`TwinUpdated` events for ml-service scoring, NLP categorisation replacing `TransactionClassifier`.
 
 Resume: `scripts/measure-twin.sh` (clean timed replay), then `scripts/verify-twin.sh` (rebuild + consistency +
 as-of; writes `logs/verify-<timestamp>.log`). Results go into the results section of `docs/twin.md`.
