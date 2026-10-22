@@ -10,6 +10,10 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    placeholders:
+      # Passwords of the read-only ML roles (V8); local defaults only.
+      ml_password: ${ML_DB_PASSWORD:fintwin_ml}
+      ml_labels_password: ${ML_LABELS_DB_PASSWORD:fintwin_ml_labels}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
