@@ -1,9 +1,6 @@
-package com.fintwin.twin.risk;
+package com.fintwin.ml;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import com.fintwin.twin.risk.client.MlRiskApi;
-import com.fintwin.twin.risk.client.MlServiceClient;
-import com.fintwin.twin.risk.client.MlServiceUnavailableException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.retry.Retry;
@@ -126,5 +123,37 @@ class MlServiceClientTests {
         server.expect(once(), requestTo(SCORE_URL)).andRespond(withSuccess("{\"scores\": []}",
                 MediaType.APPLICATION_JSON));
         assertThatThrownBy(() -> client.scoreBatch(request())).isInstanceOf(MlServiceUnavailableException.class);
+    }
+
+    @Test
+    void submitsAndFollowsSimulations() {
+        server.expect(once(), requestTo("http://ml/v1/simulations")).andExpect(method(HttpMethod.POST))
+                .andExpect(content().json("{\"scenario\": {\"horizonMonths\": 6}, \"topCustomers\": 5}"))
+                .andRespond(withStatus(HttpStatus.ACCEPTED).contentType(MediaType.APPLICATION_JSON).body("""
+                        {"jobId": "j1", "status": "QUEUED", "progress": 0,
+                         "submittedAt": "2026-10-22T08:00:00Z"}"""));
+        server.expect(once(), requestTo("http://ml/v1/simulations/j1")).andRespond(withSuccess("""
+                {"jobId": "j1", "status": "SUCCEEDED", "progress": 100, "submittedAt": "2026-10-22T08:00:00Z",
+                 "durationSeconds": 3.5, "peakRssMb": 512.0, "result": {"portfolio": {"expectedLoss": 10}}}""",
+                MediaType.APPLICATION_JSON));
+        server.expect(once(), requestTo("http://ml/v1/simulations/j1/forecasts?offset=0&limit=100"))
+                .andRespond(withSuccess("{\"jobId\": \"j1\", \"total\": 1, \"offset\": 0, \"items\": "
+                        + "[{\"customerId\": 7}]}", MediaType.APPLICATION_JSON));
+
+        var request = new MlSimulationApi.SimulationRequest(
+                JsonNodeFactory.instance.objectNode().put("horizonMonths", 6), null, null, null, 5, null);
+        assertThat(client.startSimulation(request).jobId()).isEqualTo("j1");
+        MlSimulationApi.Job job = client.simulation("j1");
+        assertThat(job.status()).isEqualTo("SUCCEEDED");
+        assertThat(job.result().path("portfolio").path("expectedLoss").asInt()).isEqualTo(10);
+        assertThat(client.simulationForecasts("j1", 0, 100).items()).hasSize(1);
+        server.verify();
+    }
+
+    @Test
+    void anUnknownSimulationIsNotRetried() {
+        server.expect(once(), requestTo("http://ml/v1/simulations/gone")).andRespond(withStatus(HttpStatus.NOT_FOUND));
+        assertThatThrownBy(() -> client.simulation("gone")).isInstanceOf(HttpClientErrorException.NotFound.class);
+        server.verify();
     }
 }

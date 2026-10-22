@@ -1,4 +1,4 @@
-package com.fintwin.twin.risk.client;
+package com.fintwin.ml;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;

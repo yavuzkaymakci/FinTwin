@@ -1,4 +1,4 @@
-package com.fintwin.twin.risk.client;
+package com.fintwin.ml;
 
 import com.fasterxml.jackson.databind.JsonNode;
 

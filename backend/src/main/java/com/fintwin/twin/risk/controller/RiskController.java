@@ -1,6 +1,6 @@
 package com.fintwin.twin.risk.controller;
 
-import com.fintwin.twin.risk.client.MlServiceUnavailableException;
+import com.fintwin.ml.MlServiceUnavailableException;
 import com.fintwin.twin.risk.dto.RiskScoreView;
 import com.fintwin.twin.risk.dto.ScoringStatus;
 import com.fintwin.twin.risk.service.RiskScoringService;

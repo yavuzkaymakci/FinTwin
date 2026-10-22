@@ -1,4 +1,4 @@
-package com.fintwin.twin.risk.client;
+package com.fintwin.ml;
 
 /** The ML service could not be reached, failed, or its circuit breaker is open. */
 public class MlServiceUnavailableException extends RuntimeException {

@@ -4,9 +4,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fintwin.twin.risk.client.MlRiskApi;
-import com.fintwin.twin.risk.client.MlServiceClient;
-import com.fintwin.twin.risk.client.MlServiceProperties;
+import com.fintwin.ml.MlRiskApi;
+import com.fintwin.ml.MlServiceClient;
+import com.fintwin.ml.MlServiceProperties;
 import com.fintwin.twin.risk.dto.RiskScoreView;
 import com.fintwin.twin.risk.dto.ScoringStatus;
 import com.fintwin.twin.risk.store.RiskScoreRepository;
@@ -110,7 +110,7 @@ public class RiskScoringService {
     /**
      * Scores one customer now and stores the result.
      *
-     * @throws com.fintwin.twin.risk.client.MlServiceUnavailableException if the ML service is unavailable
+     * @throws com.fintwin.ml.MlServiceUnavailableException if the ML service is unavailable
      */
     public Optional<RiskScoreView> scoreNow(long customerId) {
         Optional<TwinInput> twin = repository.twin(customerId);

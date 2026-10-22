@@ -1,4 +1,4 @@
-package com.fintwin.twin.risk.client;
+package com.fintwin.ml;
 
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
@@ -46,6 +46,32 @@ public class MlServiceClient {
     public MlRiskApi.ActiveModels activeModels() {
         return call("active models", () -> rest.get().uri("/v1/models/active").retrieve()
                 .body(MlRiskApi.ActiveModels.class));
+    }
+
+    /** Submits a simulation job (the ML service answers 202 with the job id). */
+    public MlSimulationApi.Job startSimulation(MlSimulationApi.SimulationRequest request) {
+        return call("start simulation", () -> rest.post().uri("/v1/simulations")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(request)
+                .retrieve()
+                .body(MlSimulationApi.Job.class));
+    }
+
+    /**
+     * Status (and result, once finished) of a simulation job.
+     *
+     * @throws HttpClientErrorException.NotFound if the ML service does not know the job (e.g. it was restarted)
+     */
+    public MlSimulationApi.Job simulation(String jobId) {
+        return call("simulation status", () -> rest.get().uri("/v1/simulations/{id}", jobId).retrieve()
+                .body(MlSimulationApi.Job.class));
+    }
+
+    public MlSimulationApi.ForecastPage simulationForecasts(String jobId, int offset, int limit) {
+        return call("simulation forecasts", () -> rest.get()
+                .uri("/v1/simulations/{id}/forecasts?offset={offset}&limit={limit}", jobId, offset, limit)
+                .retrieve()
+                .body(MlSimulationApi.ForecastPage.class));
     }
 
     public CircuitBreaker.State circuitState() {

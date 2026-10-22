@@ -2,9 +2,9 @@ package com.fintwin.twin.risk;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fintwin.TestcontainersConfiguration;
-import com.fintwin.twin.risk.client.MlRiskApi;
-import com.fintwin.twin.risk.client.MlServiceClient;
-import com.fintwin.twin.risk.client.MlServiceUnavailableException;
+import com.fintwin.ml.MlRiskApi;
+import com.fintwin.ml.MlServiceClient;
+import com.fintwin.ml.MlServiceUnavailableException;
 import com.fintwin.twin.risk.dto.RiskScoreView;
 import com.fintwin.twin.risk.service.RiskScoringService;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;

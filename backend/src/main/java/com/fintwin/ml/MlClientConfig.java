@@ -1,4 +1,4 @@
-package com.fintwin.twin.risk.client;
+package com.fintwin.ml;
 
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.retry.RetryRegistry;

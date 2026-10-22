@@ -2,7 +2,7 @@ package com.fintwin.twin.risk;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fintwin.config.SecurityConfig;
-import com.fintwin.twin.risk.client.MlServiceUnavailableException;
+import com.fintwin.ml.MlServiceUnavailableException;
 import com.fintwin.twin.risk.controller.RiskController;
 import com.fintwin.twin.risk.dto.RiskScoreView;
 import com.fintwin.twin.risk.dto.ScoringStatus;

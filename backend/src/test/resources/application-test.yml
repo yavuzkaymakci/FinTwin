@@ -10,3 +10,7 @@ fintwin:
   twin:
     consumer:
       enabled: false
+  # Tests drive simulation polling explicitly (SimulationService.pollActiveRuns).
+  simulation:
+    polling:
+      enabled: false
