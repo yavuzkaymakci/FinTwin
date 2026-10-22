@@ -35,6 +35,18 @@ spring:
         max.partition.fetch.bytes: 16777216
         fetch.max.bytes: 67108864
 
+  ai:
+    model:
+      # Chat provider of the assistants: none (default; assistants answer 503), anthropic or ollama. The profiles
+      # "anthropic" and "ollama" set it; see CLAUDE.md / docs/assistants.md.
+      chat: none
+      embedding: none
+    chat:
+      memory:
+        repository:
+          jdbc:
+            initialize-schema: never  # table created by Flyway V10
+
 server:
   port: ${SERVER_PORT:8080}
 
@@ -54,6 +66,14 @@ fintwin:
     read-timeout: 30s
     # Customers per /v1/risk/score/batch call (the ML service accepts up to 1000).
     batch-size: 500
+
+  assistant:
+    max-tool-calls: 8          # per chat request
+    memory-messages: 20        # message window of the PostgreSQL chat memory
+    rate-limit:
+      requests: 20             # per user and assistant ...
+      window: 10m              # ... in this sliding window
+    max-wait-seconds: 60       # longest waitForRun the scenario assistant may block a request
 
 resilience4j:
   retry:

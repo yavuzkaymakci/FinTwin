@@ -6,7 +6,9 @@ import org.springframework.stereotype.Repository;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.TreeMap;
 
 /** Twin inputs for scoring and the scores themselves ({@code twin.customer_risk_score}); twin schema only. */
 @Repository
@@ -73,6 +75,45 @@ public class RiskScoreRepository {
                 (rs, i) -> new StoredScore(rs.getLong(1), rs.getTimestamp(2).toInstant(),
                         rs.getTimestamp(3).toInstant(), rs.getDouble(4), rs.getDouble(5), rs.getInt(6),
                         rs.getString(7), rs.getString(8), rs.getString(9)), customerId).stream().findFirst();
+    }
+
+    /** Aggregates of the latest portfolio scoring run: (scored_at, customers, mean pd, mean churn, versions). */
+    public record RunAggregate(Instant scoredAt, long customers, double meanPd, double meanChurn,
+                               String pdModelVersion, String churnModelVersion) {
+    }
+
+    public Optional<RunAggregate> latestRun() {
+        return jdbc.query("""
+                SELECT scored_at, COUNT(*), AVG(pd), AVG(churn), MAX(pd_model_version), MAX(churn_model_version)
+                FROM twin.customer_risk_score
+                WHERE scored_at = (SELECT MAX(scored_at) FROM twin.customer_risk_score
+                                   WHERE scored_at IN (SELECT scored_at FROM twin.customer_risk_score
+                                                       GROUP BY scored_at HAVING COUNT(*) > 1))
+                GROUP BY scored_at""",
+                (rs, i) -> new RunAggregate(rs.getTimestamp(1).toInstant(), rs.getLong(2), rs.getDouble(3),
+                        rs.getDouble(4), rs.getString(5), rs.getString(6))).stream().findFirst();
+    }
+
+    /** Customers per risk grade in the given scoring run. */
+    public Map<Integer, Long> gradeCounts(Instant scoredAt) {
+        Map<Integer, Long> out = new TreeMap<>();
+        jdbc.query("SELECT risk_grade, COUNT(*) FROM twin.customer_risk_score WHERE scored_at = ? GROUP BY 1",
+                rs -> {
+                    out.put(rs.getInt(1), rs.getLong(2));
+                }, Timestamp.from(scoredAt));
+        return out;
+    }
+
+    /** Mean PD, mean churn and customers per segment in the given scoring run. */
+    public Map<String, double[]> segmentAverages(Instant scoredAt) {
+        Map<String, double[]> out = new TreeMap<>();
+        jdbc.query("""
+                SELECT s.state ->> 'segment', AVG(r.pd), AVG(r.churn), COUNT(*)
+                FROM twin.customer_risk_score r JOIN twin.customer_twin_state s ON s.customer_id = r.customer_id
+                WHERE r.scored_at = ? GROUP BY 1""", rs -> {
+            out.put(String.valueOf(rs.getString(1)), new double[]{rs.getDouble(2), rs.getDouble(3), rs.getLong(4)});
+        }, Timestamp.from(scoredAt));
+        return out;
     }
 
     public long countScores(Instant scoredAt) {

@@ -1,0 +1,13 @@
+# Assistants on the Anthropic Claude API. Run with: SPRING_PROFILES_ACTIVE=local,anthropic and ANTHROPIC_API_KEY set
+# in the environment (never in the repository).
+spring:
+  ai:
+    model:
+      chat: anthropic
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY}
+      chat:
+        options:
+          model: ${ANTHROPIC_MODEL:claude-sonnet-5-5}
+          temperature: 0.2
+          max-tokens: 2048

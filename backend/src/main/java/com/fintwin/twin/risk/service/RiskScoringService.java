@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fintwin.ml.MlRiskApi;
 import com.fintwin.ml.MlServiceClient;
 import com.fintwin.ml.MlServiceProperties;
+import com.fintwin.twin.risk.dto.PortfolioRiskSummary;
 import com.fintwin.twin.risk.dto.RiskScoreView;
 import com.fintwin.twin.risk.dto.ScoringStatus;
 import com.fintwin.twin.risk.store.RiskScoreRepository;
@@ -120,6 +121,17 @@ public class RiskScoringService {
         StoredScore score = score(List.of(twin.get()), Instant.now().truncatedTo(ChronoUnit.MICROS)).getFirst();
         repository.saveAll(List.of(score));
         return Optional.of(view(score));
+    }
+
+    /** Summary of the latest portfolio scoring run, if the portfolio has been scored. */
+    public Optional<PortfolioRiskSummary> portfolioSummary() {
+        return repository.latestRun().map(run -> new PortfolioRiskSummary(run.scoredAt(), run.customers(),
+                run.meanPd(), run.meanChurn(), repository.gradeCounts(run.scoredAt()),
+                repository.segmentAverages(run.scoredAt()).entrySet().stream()
+                        .map(e -> new PortfolioRiskSummary.Segment(e.getKey(), (long) e.getValue()[2],
+                                e.getValue()[0], e.getValue()[1]))
+                        .toList(),
+                run.pdModelVersion(), run.churnModelVersion()));
     }
 
     public ScoringStatus status() {

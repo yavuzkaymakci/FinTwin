@@ -1,0 +1,12 @@
+# Assistants on a local Ollama server (a model with tool calling, e.g. qwen2.5:7b-instruct or llama3.1:8b).
+# Run with: SPRING_PROFILES_ACTIVE=local,ollama after `ollama pull <model>`.
+spring:
+  ai:
+    model:
+      chat: ollama
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+      chat:
+        options:
+          model: ${OLLAMA_MODEL:qwen2.5:7b-instruct}
+          temperature: 0.2

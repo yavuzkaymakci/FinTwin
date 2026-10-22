@@ -1,5 +1,6 @@
 package com.fintwin.ml;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.retry.Retry;
@@ -72,6 +73,19 @@ public class MlServiceClient {
                 .uri("/v1/simulations/{id}/forecasts?offset={offset}&limit={limit}", jobId, offset, limit)
                 .retrieve()
                 .body(MlSimulationApi.ForecastPage.class));
+    }
+
+    /**
+     * Savings-goal simulation of one customer (probability of reaching the target, required extra saving).
+     *
+     * @throws HttpClientErrorException.NotFound if the customer has no active twin
+     */
+    public JsonNode simulateGoal(MlGoalApi.GoalRequest request) {
+        return call("goal simulation", () -> rest.post().uri("/v1/goals/simulate")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(request)
+                .retrieve()
+                .body(JsonNode.class));
     }
 
     public CircuitBreaker.State circuitState() {
