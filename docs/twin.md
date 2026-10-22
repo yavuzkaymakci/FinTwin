@@ -254,4 +254,38 @@ curl localhost:8080/api/admin/replay/status
 writes to `logs/`).
 
 <!-- results:start -->
+## Measured results (default data set: 5,000 customers × 24 months)
+
+Laptop, PostgreSQL 16 and Kafka in Docker Desktop, backend with 6 consumer threads. Logs:
+`logs/measure-20261022-083120.log`, `logs/verify-20261022-083849.log` (local, gitignored).
+
+**Clean bulk replay** (`scripts/measure-twin.sh`: twin tables, replay cursor, consumer group and all `fintwin.*`
+topics reset first; publishing and consuming run concurrently):
+
+| Metric | Value |
+|---|---|
+| Outbox events | 5,688,485 (prepare: ~23 s) |
+| Publishing finished | 262 s — 21,700 events/s (alone, without a concurrent consumer: ~36,000 events/s) |
+| Twin complete (all events stored **and** applied) | 397 s — **14,300 events/s end to end** |
+| Twins / snapshots | 5,000 / 99,693 |
+| Dead-lettered records | 0 |
+
+Throughput depends mainly on how often each customer's projection is rewritten: batches of up to 20,000 records
+and 91 days of retained buckets keep that low. With 5,000-record batches and the default 128 MB `shared_buffers`
+the consumer degraded to ~4,000 events/s; infra/docker-compose.yml therefore tunes Postgres for bulk loads.
+
+**Rebuild** (`scripts/verify-twin.sh`):
+
+| Mode | Events | Duration | Mismatches |
+|---|---|---|---|
+| VERIFY | 5,688,485 | 120 s (47,000 events/s) | 0 states, 0 snapshot series |
+| REPLACE | 5,688,485 | 119 s (48,000 events/s) | checksums of all 5,000 projections and 99,693 snapshots identical before and after |
+
+**Consistency with core banking**:
+
+- all 11,247 accounts: twin balance = `account.balance` (0 mismatches);
+- 20 randomly chosen customers (41 accounts, TRY and USD, checking, deposit and card): all equal;
+- as-of: 5 random customers × 3 dates (2024-12-15, 2025-06-01, 2026-01-31) — every account balance from
+  `GET /api/twins/{id}?asOf=` equals the balance recomputed from core banking as opening balance plus movements
+  before the cut-off.
 <!-- results:end -->

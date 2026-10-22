@@ -15,11 +15,11 @@ Done (committed):
   twin complete after 397 s (14.3k ev/s end to end), 5,000 twins, 99,693 snapshots, 0 DLT. Docs twin.md,
   architecture.md, CLAUDE.md committed. Backend left running from the measurement script.
 
+- 2026-10-22: verification (`logs/verify-20261022-083849.log`): rebuild VERIFY/REPLACE 0 mismatches, identical
+  checksums; 11,247/11,247 accounts match; 20 random customers OK; as-of 15/15 OK. Results in docs/twin.md.
+
 In progress:
-2. Rebuild VERIFY/REPLACE on the full data set.
-3. Consistency: ≥ 20 random customers' twin balances vs core banking; asOf spot checks.
-4. Docs: `docs/twin.md` (feature dictionary), event flow diagram in `docs/architecture.md`, `CLAUDE.md`.
-5. Final commits.
+- Final full test suite (`logs/test-*.log`), then final commit. Step 3 is otherwise complete.
 
 Resume: `scripts/measure-twin.sh` (clean timed replay), then `scripts/verify-twin.sh` (rebuild + consistency +
 as-of; writes `logs/verify-<timestamp>.log`). Results go into the results section of `docs/twin.md`.
