@@ -73,6 +73,12 @@
             <artifactId>resilience4j-spring-boot3</artifactId>
             <version>2.2.0</version>
         </dependency>
+        <!-- OpenAPI description and Swagger UI (/swagger-ui.html, /v3/api-docs). -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>2.8.17</version>
+        </dependency>
         <!-- AI assistants: provider chosen by profile (anthropic | ollama), chat memory in PostgreSQL. -->
         <dependency>
             <groupId>org.springframework.ai</groupId>

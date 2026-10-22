@@ -13,7 +13,8 @@ import java.util.List;
 public record ChatAnswer(String conversationId, String answer, String status, List<ToolCall> toolCalls,
                          List<Long> runIds, Validation validation, Usage usage, long durationMs, String model) {
 
-    public record ToolCall(String name, String arguments, boolean ok, long durationMs) {
+    /** {@code result}: the tool's JSON result, truncated to 4,000 characters (for tool tags and result cards). */
+    public record ToolCall(String name, String arguments, String result, boolean ok, long durationMs) {
     }
 
     public record Validation(boolean passed, int checked, List<String> unverified) {

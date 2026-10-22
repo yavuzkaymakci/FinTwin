@@ -5,6 +5,8 @@ import com.fintwin.assistant.core.AssistantExceptions;
 import com.fintwin.assistant.core.AssistantType;
 import com.fintwin.assistant.dto.ChatAnswer;
 import com.fintwin.assistant.dto.ChatRequest;
+import com.fintwin.assistant.dto.ConversationSummary;
+import com.fintwin.assistant.dto.ConversationTurn;
 import com.fintwin.assistant.service.AssistantService;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
@@ -12,6 +14,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -52,6 +56,26 @@ public class AssistantController {
     @PostMapping("/coach/chat")
     public ChatAnswer coach(@Valid @RequestBody ChatRequest request) {
         return assistants.chat(AssistantType.COACH, request);
+    }
+
+    /** The current user's conversations ({@code assistant}: scenario or coach), newest first. */
+    @GetMapping("/{assistant}/conversations")
+    public List<ConversationSummary> conversations(@PathVariable String assistant) {
+        return assistants.conversations(type(assistant));
+    }
+
+    /** All turns of one of the current user's conversations, with tool calls, validation and run ids. */
+    @GetMapping("/{assistant}/conversations/{conversationId}")
+    public List<ConversationTurn> history(@PathVariable String assistant, @PathVariable String conversationId) {
+        return assistants.history(type(assistant), conversationId);
+    }
+
+    private static AssistantType type(String assistant) {
+        return switch (assistant) {
+            case "scenario" -> AssistantType.SCENARIO;
+            case "coach" -> AssistantType.COACH;
+            default -> throw new AssistantExceptions.ConversationNotFound();
+        };
     }
 
     @PostMapping(value = "/scenario/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

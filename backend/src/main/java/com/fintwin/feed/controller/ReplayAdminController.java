@@ -1,5 +1,6 @@
 package com.fintwin.feed.controller;
 
+import com.fintwin.feed.demo.DemoPrepareService;
 import com.fintwin.feed.consistency.ConsistencyCheckService;
 import com.fintwin.feed.dto.ConsistencyReport;
 import com.fintwin.feed.dto.PrepareResult;
@@ -28,7 +29,11 @@ public class ReplayAdminController {
     private final ReplayService replayService;
     private final ConsistencyCheckService consistencyCheckService;
 
-    public ReplayAdminController(ReplayService replayService, ConsistencyCheckService consistencyCheckService) {
+    private final DemoPrepareService demoPrepareService;
+
+    public ReplayAdminController(ReplayService replayService, ConsistencyCheckService consistencyCheckService,
+                                 DemoPrepareService demoPrepareService) {
+        this.demoPrepareService = demoPrepareService;
         this.replayService = replayService;
         this.consistencyCheckService = consistencyCheckService;
     }
@@ -70,6 +75,16 @@ public class ReplayAdminController {
     @PostMapping("/reset")
     public ReplayStatus reset() {
         return replayService.reset();
+    }
+
+    /**
+     * Demo preparation (background, ~7 minutes): rebuilds the twin from scratch with everything except the last
+     * {@code days} days, so a following live replay applies those days and the twins visibly change.
+     */
+    @PostMapping("/demo-prepare")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public DemoPrepareService.DemoPreparation demoPrepare(@RequestParam(defaultValue = "3") int days) {
+        return demoPrepareService.prepare(days);
     }
 
     @GetMapping("/status")

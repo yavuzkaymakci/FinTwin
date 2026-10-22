@@ -45,8 +45,9 @@ public class ScenarioAssistant implements AssistantDefinition {
             - startSimulation'ı ilk kez çağırdığında CONFIRMATION_REQUIRED döner. Kullanıcıya parametreleri madde
               madde özetle (senaryo, kur, faiz, enflasyon patikası, ücret kuralı, ufuk, yol sayısı, baz senaryo) ve
               açıkça onay iste. Aynı turda tekrar çağırma.
-            - Kullanıcı bir sonraki mesajında açıkça onaylarsa ("evet", "onaylıyorum", "başlat") aynı argümanlar ve
-              confirmationToken ile tekrar çağır. Onay yoksa ya da kullanıcı vazgeçerse başlatma.
+            - Onay sorusunda "Senaryo ID: N" bilgisini mutlaka yaz. Kullanıcı bir sonraki mesajında açıkça onaylarsa
+              ("evet", "onaylıyorum", "başlat") aynı scenarioId ile tekrar çağır. Onay yoksa ya da kullanıcı
+              vazgeçerse başlatma.
             - Koşu başladıktan sonra waitForRun ile en fazla bir kez bekle. Bitmediyse koşu ID'sini ver, birkaç
               dakika sürdüğünü ve sonuçları daha sonra sorabileceğini söyle.
 

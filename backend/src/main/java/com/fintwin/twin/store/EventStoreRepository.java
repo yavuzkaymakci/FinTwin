@@ -173,6 +173,22 @@ public class EventStoreRepository {
         jdbc.execute("TRUNCATE TABLE twin.event_store");
     }
 
+    /** The most recently stored events (for the live feed view). */
+    public List<RecentEvent> recent(int limit) {
+        return jdbc.query("""
+                SELECT customer_id, customer_seq, event_type, occurred_at, recorded_at,
+                       payload ->> 'amount', payload ->> 'currency', payload ->> 'direction',
+                       COALESCE(payload ->> 'merchantName', payload ->> 'rawDescription')
+                FROM twin.event_store ORDER BY recorded_at DESC, customer_id, customer_seq DESC LIMIT ?""",
+                (rs, i) -> new RecentEvent(rs.getLong(1), rs.getLong(2), rs.getString(3),
+                        rs.getTimestamp(4).toInstant(), rs.getTimestamp(5).toInstant(), rs.getString(6),
+                        rs.getString(7), rs.getString(8), rs.getString(9)), limit);
+    }
+
+    public record RecentEvent(long customerId, long customerSequence, String eventType, Instant occurredAt,
+                              Instant recordedAt, String amount, String currency, String direction, String text) {
+    }
+
     public record EventRecord(UUID eventId, long customerSequence, String eventType, Instant occurredAt,
                               String topic, Integer partition, Long offset, String payload) {
     }

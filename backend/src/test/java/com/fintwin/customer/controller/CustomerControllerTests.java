@@ -47,6 +47,9 @@ class CustomerControllerTests {
     private CustomerQueryService customerQueryService;
 
     @MockitoBean
+    private com.fintwin.customer.service.CustomerListService customerListService;
+
+    @MockitoBean
     private TransactionQueryService transactionQueryService;
 
     @Test

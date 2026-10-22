@@ -22,6 +22,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -124,6 +125,42 @@ class ScenarioAssistantTests extends AssistantTestSupport {
                 .thenText("Tamam, başlatmadım.");
         analyst(conversation, "Hayır, vazgeçtim.");
         verify(ml, never()).startSimulation(any());
+    }
+
+    @Test
+    void aPendingSimulationCanBeConfirmedWithTheScenarioIdOnly() throws Exception {
+        long fx = jdbc.queryForObject("SELECT id FROM simulation.scenario WHERE code = 'FX_SHOCK'", Long.class);
+        model.thenToolCall("startSimulation", "{\"scenarioId\": %d}".formatted(fx))
+                .thenText("Kur şoku senaryosunu başlatayım mı? Senaryo ID: %d".formatted(fx));
+        JsonNode first = analyst(null, "Kur şokunu çalıştır");
+        assertThat(first.path("toolCalls").get(0).path("result").asText()).contains("CONFIRMATION_REQUIRED");
+        model.thenToolCall("startSimulation", "{\"scenarioId\": %d}".formatted(fx)).thenText("Başladı.");
+        JsonNode second = analyst(first.path("conversationId").asText(), "Evet, başlat");
+        assertThat(second.path("toolCalls").get(0).path("result").asText()).contains("STARTED");
+        verify(ml, times(1)).startSimulation(any());
+        assertThat(second.path("runIds")).hasSize(1);
+    }
+
+    @Test
+    void conversationsAndTheirHistoryAreVisibleToTheirOwnerOnly() throws Exception {
+        model.thenToolCall("listScenarios", "{}").thenText("Beş hazır senaryo var.");
+        String conversation = analyst(null, "Hangi senaryolar var?").path("conversationId").asText();
+
+        JsonNode list = read(mvc.perform(get("/api/assistants/scenario/conversations")
+                .header("X-Demo-User", "ayse").header("X-Demo-Role", "RISK_ANALYST")).andReturn());
+        assertThat(list).hasSize(1);
+        assertThat(list.get(0).path("title").asText()).isEqualTo("Hangi senaryolar var?");
+        JsonNode history = read(mvc.perform(get("/api/assistants/scenario/conversations/" + conversation)
+                .header("X-Demo-User", "ayse").header("X-Demo-Role", "RISK_ANALYST")).andReturn());
+        assertThat(history).hasSize(1);
+        assertThat(history.get(0).path("answer").asText()).isEqualTo("Beş hazır senaryo var.");
+        assertThat(history.get(0).path("toolCalls").get(0).path("name").asText()).isEqualTo("listScenarios");
+
+        mvc.perform(get("/api/assistants/scenario/conversations/" + conversation)
+                        .header("X-Demo-User", "mehmet").header("X-Demo-Role", "RISK_ANALYST"))
+                .andExpect(status().isNotFound());
+        assertThat(read(mvc.perform(get("/api/assistants/scenario/conversations")
+                .header("X-Demo-User", "mehmet").header("X-Demo-Role", "RISK_ANALYST")).andReturn())).isEmpty();
     }
 
     @Test

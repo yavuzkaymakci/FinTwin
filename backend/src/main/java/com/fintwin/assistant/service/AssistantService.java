@@ -12,8 +12,11 @@ import com.fintwin.assistant.core.NumberValidator;
 import com.fintwin.assistant.core.RateLimiter;
 import com.fintwin.assistant.core.ToolCallRecord;
 import com.fintwin.assistant.core.TurnContext;
+import com.fintwin.assistant.dto.AiProviderInfo;
 import com.fintwin.assistant.dto.ChatAnswer;
 import com.fintwin.assistant.dto.ChatRequest;
+import com.fintwin.assistant.dto.ConversationSummary;
+import com.fintwin.assistant.dto.ConversationTurn;
 import com.fintwin.assistant.repository.ConversationRepository;
 import com.fintwin.assistant.repository.InteractionRepository;
 import com.fintwin.assistant.user.CurrentUser;
@@ -156,6 +159,19 @@ public class AssistantService {
                 outcome);
     }
 
+    /** Which chat provider is active (from the ChatModel bean, not from configuration that might be stale). */
+    public AiProviderInfo provider() {
+        ChatModel model = chatModels.getIfAvailable();
+        if (model == null) {
+            return new AiProviderInfo("none", null, false, false);
+        }
+        String name = model.getClass().getSimpleName();
+        String provider = name.startsWith("Anthropic") ? "anthropic" : name.startsWith("Ollama") ? "ollama"
+                : name.startsWith("Demo") ? "ai-demo" : name;
+        String modelName = model.getDefaultOptions() == null ? null : model.getDefaultOptions().getModel();
+        return new AiProviderInfo(provider, modelName, "ai-demo".equals(provider), true);
+    }
+
     private AssistantEngine engine() {
         AssistantEngine e = engine;
         if (e == null) {
@@ -172,7 +188,8 @@ public class AssistantService {
     private ChatAnswer answer(PreparedTurn turn, String text, String status, List<ToolCallRecord> calls,
                               List<Long> runIds, NumberValidator.Result validation, AssistantEngine.Outcome outcome) {
         return new ChatAnswer(turn.conversationId(), text, status,
-                calls.stream().map(c -> new ChatAnswer.ToolCall(c.name(), c.arguments(), c.ok(), c.durationMs()))
+                calls.stream().map(c -> new ChatAnswer.ToolCall(c.name(), c.arguments(), truncate(c.result()), c.ok(),
+                                c.durationMs()))
                         .toList(),
                 runIds,
                 validation == null ? null : new ChatAnswer.Validation(validation.passed(), validation.checked(),
@@ -205,6 +222,32 @@ public class AssistantService {
         } catch (JsonProcessingException e) {
             throw new IllegalStateException(e);
         }
+    }
+
+    private static String truncate(String value) {
+        return value == null || value.length() <= 4_000 ? value : value.substring(0, 4_000);
+    }
+
+    /** The current user's conversations with an assistant, newest first. */
+    public List<ConversationSummary> conversations(AssistantType type) {
+        CurrentUser user = users.current();
+        if (!user.has(type.role())) {
+            throw new AssistantExceptions.Forbidden("The " + type + " assistant is for role " + type.role());
+        }
+        return conversations.list(type.name(), user.userId(), user.customerId());
+    }
+
+    /** All turns of one of the current user's conversations (from the audit log, including tool calls). */
+    public List<ConversationTurn> history(AssistantType type, String conversationId) {
+        CurrentUser user = users.current();
+        var conversation = conversations.find(conversationId)
+                .orElseThrow(AssistantExceptions.ConversationNotFound::new);
+        if (!user.has(type.role()) || !conversation.assistant().equals(type.name())
+                || !conversation.userId().equals(user.userId())
+                || !Objects.equals(conversation.customerId(), user.customerId())) {
+            throw new AssistantExceptions.ConversationNotFound();
+        }
+        return interactions.history(conversationId);
     }
 
     private static long elapsedMs(PreparedTurn turn) {

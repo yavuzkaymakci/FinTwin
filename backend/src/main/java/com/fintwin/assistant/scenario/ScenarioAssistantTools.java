@@ -94,7 +94,7 @@ public class ScenarioAssistantTools {
             + "baseline (default: the BASE preset). Expensive (minutes). The first call never starts anything: it "
             + "returns CONFIRMATION_REQUIRED with a summary and a confirmationToken. Show that summary to the user "
             + "and ask for explicit approval. Only after the user approves in their next message, call again with the "
-            + "same arguments and the confirmationToken. Returns STARTED with the runId.")
+            + "same scenarioId (the confirmationToken is optional). Returns STARTED with the runId.")
     public Object startSimulation(
             @ToolParam(description = "Id of the scenario to simulate") long scenarioId,
             @ToolParam(description = "Id of the baseline scenario; omit for the BASE preset", required = false)
@@ -112,23 +112,22 @@ public class ScenarioAssistantTools {
                 scenarios.get(baseline);
             }
             LocalDate start = startDate == null || startDate.isBlank() ? null : LocalDate.parse(startDate.trim());
-            if (confirmationToken != null && !confirmationToken.isBlank()) {
-                var confirmed = confirmations.confirm(confirmationToken, turn)
-                        .filter(p -> p.scenarioId() == scenarioId);
-                if (confirmed.isPresent()) {
-                    var p = confirmed.get();
-                    SimulationRunView run = simulations.start(scenarioId,
-                            new RunRequest(p.startDate(), p.baselineScenarioId(), null, null));
-                    turn.addRunId(run.id());
-                    Map<String, Object> out = new LinkedHashMap<>();
-                    out.put("status", "STARTED");
-                    out.put("runId", run.id());
-                    out.put("scenarioCode", run.scenarioCode());
-                    out.put("runStatus", run.status());
-                    out.put("baselineScenarioId", run.baselineScenarioId());
-                    out.put("note", "Runs take about 2-4 minutes; use getRunStatus / waitForRun.");
-                    return out;
-                }
+            var confirmed = confirmationToken != null && !confirmationToken.isBlank()
+                    ? confirmations.confirm(confirmationToken, turn).filter(p -> p.scenarioId() == scenarioId)
+                    : confirmations.confirmPending(scenarioId, turn);
+            if (confirmed.isPresent()) {
+                var p = confirmed.get();
+                SimulationRunView run = simulations.start(scenarioId,
+                        new RunRequest(p.startDate(), p.baselineScenarioId(), null, null));
+                turn.addRunId(run.id());
+                Map<String, Object> out = new LinkedHashMap<>();
+                out.put("status", "STARTED");
+                out.put("runId", run.id());
+                out.put("scenarioCode", run.scenarioCode());
+                out.put("runStatus", run.status());
+                out.put("baselineScenarioId", run.baselineScenarioId());
+                out.put("note", "Runs take about 2-4 minutes; use getRunStatus / waitForRun.");
+                return out;
             }
             var pending = confirmations.issue(turn, scenarioId, baseline, start);
             Map<String, Object> out = new LinkedHashMap<>();
@@ -141,8 +140,9 @@ public class ScenarioAssistantTools {
             out.put("scenario", scenario(scenario));
             out.put("baseline", baseline == null ? "BASE preset" : scenario(scenarios.get(baseline)));
             out.put("startDate", start == null ? "current portfolio" : start.toString());
-            out.put("instruction", "Summarise the parameters in Turkish and ask the user to approve. Do not call "
-                    + "startSimulation with the token before the user's approval.");
+            out.put("instruction", "Summarise the parameters in Turkish, mention 'Senaryo ID: " + scenarioId
+                    + "' and ask the user to approve. Do not call startSimulation again before the user's approval; "
+                    + "after it, call startSimulation with the same scenarioId (the token is optional).");
             return out;
         });
     }

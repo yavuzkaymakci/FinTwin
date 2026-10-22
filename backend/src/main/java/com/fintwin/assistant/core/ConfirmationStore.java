@@ -59,6 +59,25 @@ public final class ConfirmationStore {
         return Optional.of(p);
     }
 
+    /**
+     * Confirmation without a token: the pending run of this conversation for {@code scenarioId}, issued in an earlier
+     * turn, if the current user message is an explicit yes. The model only has to remember the scenario id (it is in
+     * the confirmation question), not the token (tool results of earlier turns are not in the chat memory).
+     */
+    public Optional<Pending> confirmPending(long scenarioId, TurnContext turn) {
+        purge();
+        if (!affirmative(turn.userMessage())) {
+            return Optional.empty();
+        }
+        Optional<Pending> found = pending.values().stream()
+                .filter(p -> p.conversationId().equals(turn.conversationId()) && p.scenarioId() == scenarioId
+                        && p.issuedTurn() < turn.turn())
+                .max(java.util.Comparator.comparing(Pending::issuedAt));
+        found.ifPresent(p -> pending.values().removeIf(q -> q.conversationId().equals(p.conversationId())
+                && q.scenarioId() == scenarioId));
+        return found;
+    }
+
     public static boolean affirmative(String message) {
         String text = message == null ? "" : message.toLowerCase(Locale.forLanguageTag("tr"));
         return YES.matcher(text).find() && !NO.matcher(text).find();

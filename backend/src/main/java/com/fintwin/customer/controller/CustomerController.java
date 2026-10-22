@@ -2,7 +2,10 @@ package com.fintwin.customer.controller;
 
 import com.fintwin.common.dto.PageResponse;
 import com.fintwin.customer.dto.CustomerDetailDto;
+import com.fintwin.customer.dto.CustomerListItem;
+import com.fintwin.customer.dto.CustomerListQuery;
 import com.fintwin.customer.service.CustomerNotFoundException;
+import com.fintwin.customer.service.CustomerListService;
 import com.fintwin.customer.service.CustomerQueryService;
 import com.fintwin.transaction.dto.TransactionDto;
 import com.fintwin.transaction.service.TransactionQueryService;
@@ -26,11 +29,33 @@ public class CustomerController {
 
     private final CustomerQueryService customerQueryService;
     private final TransactionQueryService transactionQueryService;
+    private final CustomerListService customerListService;
 
     public CustomerController(CustomerQueryService customerQueryService,
-                              TransactionQueryService transactionQueryService) {
+                              TransactionQueryService transactionQueryService,
+                              CustomerListService customerListService) {
         this.customerQueryService = customerQueryService;
         this.transactionQueryService = transactionQueryService;
+        this.customerListService = customerListService;
+    }
+
+    /**
+     * Customers with their latest risk score and twin features. {@code search} matches the customer id or the city;
+     * {@code sort} is one of id, pd, churn, riskGrade, age, income, utilization, buffer, debt.
+     */
+    @GetMapping
+    public PageResponse<CustomerListItem> list(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String segment,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Integer minGrade,
+            @RequestParam(required = false) Integer maxGrade,
+            @RequestParam(defaultValue = "id") String sort,
+            @RequestParam(defaultValue = "asc") String direction,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+        return customerListService.list(new CustomerListQuery(search, segment, status, minGrade, maxGrade, sort,
+                "desc".equalsIgnoreCase(direction), page, size));
     }
 
     @GetMapping("/{id}")
