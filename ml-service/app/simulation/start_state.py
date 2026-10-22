@@ -216,10 +216,12 @@ def load_start(start_date: date | None, customer_ids: list[int] | None = None,
     """Loads the starting portfolio: the snapshot at ``start_date`` or the current twin state."""
     if start_date is None:
         start = data_end(url)
-        frame = read_frame(CURRENT_SQL, url=url)
+        frame = read_frame(CURRENT_SQL + (" WHERE customer_id = ANY(%s)" if customer_ids else ""),
+                           (list(customer_ids),) if customer_ids else None, url=url)
     else:
         start = start_date
-        frame = read_frame(SNAPSHOT_SQL, (start_date,), url=url)
+        frame = read_frame(SNAPSHOT_SQL + (" AND customer_id = ANY(%s)" if customer_ids else ""),
+                           (start_date, list(customer_ids)) if customer_ids else (start_date,), url=url)
         if frame.empty:
             raise ValueError(f"No twin snapshots at {start_date}")
     ended = set(read_frame(ENDED_SQL, (start,), url=url)["customer_id"].tolist()) if not frame.empty else set()

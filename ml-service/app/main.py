@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 
 from app import __version__
 from app.api.categorize import router as categorize_router
+from app.api.goals import router as goals_router
 from app.api.health import router as health_router
 from app.api.models import router as models_router
 from app.api.risk import router as risk_router
@@ -22,6 +23,7 @@ def create_app() -> FastAPI:
     app.include_router(risk_router)
     app.include_router(categorize_router)
     app.include_router(simulations_router)
+    app.include_router(goals_router)
 
     @app.exception_handler(ModelUnavailableError)
     async def model_unavailable(_: Request, exc: ModelUnavailableError) -> JSONResponse:

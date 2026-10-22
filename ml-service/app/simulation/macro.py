@@ -147,7 +147,8 @@ def reference_path(start: MacroStart, horizon: int) -> MacroPath:
     months = [add_months(start.start, -m) for m in range(1, 13)]
     level = float(np.prod([1 + start.inflation_history.get(m, 0.0) for m in months]))
     monthly = level ** (1 / 12) - 1
-    neutral = ScenarioParameters(
+    # model_construct: internal path, may exceed the 36-month limit of user scenarios (savings goals).
+    neutral = ScenarioParameters.model_construct(
         horizon_months=horizon, usd_try_change_pct=min(((1 + monthly) ** horizon - 1) * 100, 200),
         policy_rate_change_bp=0, monthly_inflation_pct=[monthly * 100], wage_indexation_pct=100,
         wage_adjustment_lag_months=6, shock_profile=ShockProfile.GRADUAL, shock_ramp_months=horizon,

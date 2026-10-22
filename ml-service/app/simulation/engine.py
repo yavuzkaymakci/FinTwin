@@ -176,8 +176,13 @@ class LoanSchedule:
 class Projection:
     """Projected financial state of one chunk of customers over all paths (arrays (P, c))."""
 
-    def __init__(self, start: PortfolioStart, path: MacroPath, assumptions: Assumptions, paths: int) -> None:
+    def __init__(self, start: PortfolioStart, path: MacroPath, assumptions: Assumptions, paths: int,
+                 category_scale: np.ndarray | None = None, extra_saving: float = 0.0) -> None:
+        """``category_scale`` (K,) multiplies spending per category (e.g. 0.5 = half the restaurant spending);
+        ``extra_saving`` is set aside every month on top (nominal TRY), as in a savings plan."""
         self.s = start
+        self.category_scale = np.ones(len(CATEGORIES)) if category_scale is None else np.asarray(category_scale)
+        self.extra_saving = extra_saving
         self.path = path
         self.a = assumptions
         self.loans = LoanSchedule.of(start, path.horizon)
@@ -251,7 +256,7 @@ class Projection:
         category_price = np.where(_FX, (1 - a.fx_pass_through) * price + a.fx_pass_through * fx, price)
         elastic = np.power(np.maximum(real_income, 1e-6), a.discretionary_elasticity)  # (P, c)
         noise = np.exp(a.expense_volatility * expense_eps - a.expense_volatility ** 2 / 2) * self.expense_level[t]
-        categories = (s.category_base[None, :, :] * category_price[None, None, :]
+        categories = (s.category_base[None, :, :] * (category_price * self.category_scale)[None, None, :]
                       * np.where(_DISCRETIONARY[None, None, :], elastic[:, :, None], 1.0) * noise[:, :, None])
         spend = categories.sum(-1)
         other = self.other0 * price * noise
@@ -264,7 +269,7 @@ class Projection:
         cash_out = spend + other + installment
         deposit_interest = np.maximum(self.liquidity, 0) * self.deposit_share * path.deposit_rate[t] * (
             1 - a.deposit_tax_rate)
-        liquidity = self.liquidity + income - cash_out + deposit_interest
+        liquidity = self.liquidity + income - cash_out + deposit_interest + self.extra_saving
 
         # Negative cash flow: liquidity buffer first, then USD savings (revalued), then the card limit.
         shortfall = np.maximum(-liquidity, 0)
