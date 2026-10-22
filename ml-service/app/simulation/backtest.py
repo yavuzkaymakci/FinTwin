@@ -84,8 +84,12 @@ def observed(start: PortfolioStart) -> dict[str, Any]:
             "defaultRate": float(is_default[credit].sum() / max(credit.sum(), 1)),
             "churnRate": float(is_churn[members].sum() / max(members.sum(), 1)),
             "defaults": int(is_default[credit].sum()), "churns": int(is_churn[members].sum())}
-    # Actual feature means 6 months later for the customers still active then.
-    later = load_start(end, customer_ids=ids.tolist())
+    # Actual feature means 6 months later for the customers still active then (no snapshot at the data end).
+    try:
+        later = load_start(end, customer_ids=ids.tolist())
+    except ValueError:
+        out["featureMeansAfter"] = None
+        return out
     means = {}
     for name in TRACKED:
         values = np.array([f.get(name) for f in later.features0], dtype=float)
