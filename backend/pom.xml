@@ -116,6 +116,20 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <!-- Heap of the application started by spring-boot:run (generator, replay, twin). -->
+                    <jvmArguments>-Xmx1536m</jvmArguments>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <!-- One forked test JVM with a bounded heap; Testcontainers adds ~1.5 GB of containers. -->
+                    <forkCount>1</forkCount>
+                    <reuseForks>true</reuseForks>
+                    <argLine>-Xmx1g -XX:MaxMetaspaceSize=384m -XX:+UseSerialGC</argLine>
+                </configuration>
             </plugin>
         </plugins>
     </build>

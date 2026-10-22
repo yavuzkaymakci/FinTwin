@@ -5,6 +5,7 @@ services:
     image: postgres:16-alpine
     container_name: fintwin-postgres
     restart: unless-stopped
+    mem_limit: 1536m
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-fintwin}
       POSTGRES_USER: ${POSTGRES_USER:-fintwin}
@@ -28,6 +29,7 @@ services:
     image: confluentinc/cp-kafka:7.9.1
     container_name: fintwin-kafka
     restart: unless-stopped
+    mem_limit: 1536m
     ports:
       - "${KAFKA_PORT:-9092}:9092"
     environment:
@@ -48,6 +50,7 @@ services:
       KAFKA_NUM_PARTITIONS: 3
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
       KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_HEAP_OPTS: ${KAFKA_HEAP_OPTS:--Xms512m -Xmx1g}
     volumes:
       - kafka-data:/var/lib/kafka/data
     healthcheck:
@@ -61,6 +64,7 @@ services:
     image: kafbat/kafka-ui:v1.3.0
     container_name: fintwin-kafka-ui
     restart: unless-stopped
+    mem_limit: 512m
     depends_on:
       kafka:
         condition: service_healthy
@@ -70,6 +74,7 @@ services:
       KAFKA_CLUSTERS_0_NAME: fintwin-local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
       DYNAMIC_CONFIG_ENABLED: "true"
+      JAVA_OPTS: "-Xmx256m"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP"]
       interval: 15s

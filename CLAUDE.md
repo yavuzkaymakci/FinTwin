@@ -191,6 +191,19 @@ Generator overrides: `GENERATOR_CUSTOMERS`, `GENERATOR_MONTHS`, `GENERATOR_SEED`
 `GENERATOR_RESET`, `GENERATOR_REPORT_PATH` (default 5000 / 24 / 42 / 2026-09 / true / `../docs/data-generation.md`).
 Full run: ~11 M rows in ~2–3 min; it truncates previously generated tables (reference data is kept).
 
+Memory budget (16 GB laptop, WSL2 capped at 6 GB + 4 GB swap) — keep these limits when adding services or tests:
+
+| Process | Limit | Where |
+|---------|-------|-------|
+| Maven JVM | `-Xmx512m` | `backend/.mvn/jvm.config` |
+| Test JVM (single fork) | `-Xmx1g -XX:MaxMetaspaceSize=384m` | surefire `argLine` in `backend/pom.xml` |
+| Testcontainers Postgres / Kafka | 768 MB each, Kafka `KAFKA_HEAP_OPTS=-Xms256m -Xmx512m` | `TestcontainersConfiguration` |
+| App via `spring-boot:run` | `-Xmx1536m` | spring-boot-maven-plugin `jvmArguments` |
+| Compose Postgres / Kafka / Kafka UI | 1.5 GB / 1.5 GB (`-Xmx1g`) / 512 MB (`-Xmx256m`) | `infra/docker-compose.yml` |
+
+Stop the compose stack before `mvnw test` (`docker compose -f infra/docker-compose.yml stop`; tests use their own
+containers) and start it again afterwards; never run the test suite and a replay/generation at the same time.
+
 Windows note: if `java -version` shows an old JRE, the shell's PATH predates the JDK 21 install — set
 `JAVA_HOME` to the Temurin 21 directory and prepend `$JAVA_HOME/bin` (and Docker's `resources/bin`) to PATH.
 

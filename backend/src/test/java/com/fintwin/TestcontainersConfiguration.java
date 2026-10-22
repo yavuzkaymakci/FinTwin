@@ -17,11 +17,18 @@ import org.testcontainers.utility.DockerImageName;
 @TestConfiguration(proxyBeanMethods = false)
 public class TestcontainersConfiguration {
 
+    private static final long MIB = 1024L * 1024;
+
+    // Memory caps keep the test run within a laptop budget (JVM 1 GB + containers ~1.5 GB).
     static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>(DockerImageName.parse("postgres:16-alpine"));
+            new PostgreSQLContainer<>(DockerImageName.parse("postgres:16-alpine"))
+                    .withCommand("postgres", "-c", "shared_buffers=128MB", "-c", "fsync=off")
+                    .withCreateContainerCmdModifier(cmd -> cmd.getHostConfig().withMemory(768 * MIB));
 
     static final ConfluentKafkaContainer KAFKA =
-            new ConfluentKafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.9.1"));
+            new ConfluentKafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.9.1"))
+                    .withEnv("KAFKA_HEAP_OPTS", "-Xms256m -Xmx512m")
+                    .withCreateContainerCmdModifier(cmd -> cmd.getHostConfig().withMemory(768 * MIB));
 
     static {
         POSTGRES.start();
