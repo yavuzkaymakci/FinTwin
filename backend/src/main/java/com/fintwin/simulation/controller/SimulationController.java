@@ -71,6 +71,13 @@ public class SimulationController {
         return simulations.start(id, request);
     }
 
+    /** Recent runs, newest first, without results ({@code scenarioId} filters one scenario). */
+    @GetMapping("/api/simulation-runs")
+    public List<SimulationRunView> runs(@RequestParam(required = false) Long scenarioId,
+                                        @RequestParam(defaultValue = "50") int limit) {
+        return simulations.recent(scenarioId, limit);
+    }
+
     @GetMapping("/api/simulation-runs/{id}")
     public SimulationRunView simulationRun(@PathVariable long id) {
         return simulations.view(id);

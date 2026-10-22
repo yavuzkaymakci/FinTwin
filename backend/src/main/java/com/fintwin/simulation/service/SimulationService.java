@@ -148,6 +148,11 @@ public class SimulationService {
                 .orElseThrow(() -> new SimulationNotFoundException("Unknown simulation run " + runId));
     }
 
+    /** Recent runs (status and timing only; fetch one run for its result). */
+    public List<SimulationRunView> recent(Long scenarioId, int limit) {
+        return runs.recent(scenarioId, Math.max(1, Math.min(limit, 200))).stream().map(this::view).toList();
+    }
+
     public RunComparison compare(List<Long> ids) {
         if (ids.isEmpty()) {
             throw new IllegalArgumentException("ids must list at least one run");

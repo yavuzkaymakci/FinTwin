@@ -169,6 +169,9 @@ class SimulationServiceTests {
         simulations.pollActiveRuns();
         jdbc.update("UPDATE simulation.simulation_run SET result = jsonb_set(result, '{portfolio,expectedLoss}', "
                 + "'7000000') WHERE id = ?", fx);
+        assertThat(simulations.recent(null, 10)).extracting(SimulationRunView::id).containsExactly(fx, base);
+        assertThat(simulations.recent(scenarioId("BASE"), 10)).extracting(SimulationRunView::id).containsExactly(base);
+        assertThat(simulations.recent(null, 10).getFirst().result()).isNull();  // listing omits the result JSON
         RunComparison comparison = simulations.compare(List.of(base, fx));
         assertThat(comparison.runs()).extracting(RunComparison.Row::scenarioCode).containsExactly("BASE", "FX_SHOCK");
         assertThat(comparison.runs().get(1).expectedLossDeltaVsFirst()).isEqualTo(2_000_000);

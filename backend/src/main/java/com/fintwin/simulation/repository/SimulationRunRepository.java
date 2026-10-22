@@ -63,6 +63,13 @@ public class SimulationRunRepository {
         return ids.stream().map(this::findById).flatMap(Optional::stream).toList();
     }
 
+    /** Most recent runs (optionally of one scenario), newest first, without their result JSON. */
+    public List<Run> recent(Long scenarioId, int limit) {
+        String sql = SELECT.replace("r.result::text", "NULL::text") + (scenarioId == null ? "" : " WHERE r.scenario_id = ?")
+                + " ORDER BY r.id DESC LIMIT ?";
+        return scenarioId == null ? jdbc.query(sql, MAPPER, limit) : jdbc.query(sql, MAPPER, scenarioId, limit);
+    }
+
     /** Runs submitted to the ML service and not finished yet, oldest first. */
     public List<Run> findActive() {
         return jdbc.query(SELECT + " WHERE r.status IN ('QUEUED', 'RUNNING') AND r.ml_job_id IS NOT NULL "
