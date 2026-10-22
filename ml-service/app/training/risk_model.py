@@ -109,6 +109,13 @@ def evaluate(artifact: RiskModelArtifact, parts: dict[str, pd.DataFrame], x: dic
 
     test = parts["test"]
     p_test = predictions["test"]["lightgbm"]
+    # Behavioural scores are dominated by customers already in arrears; banks also report the "performing" book.
+    performing = (test["days_since_last_late"].to_numpy() > 90)
+    report["performing_test"] = {
+        "definition": "no late payment in the 90 days before the observation date",
+        "lightgbm": discrimination(y["test"][performing], p_test[performing]),
+        "logistic": discrimination(y["test"][performing], predictions["test"]["logistic"][performing]),
+    }
     report["calibration_test"] = {
         "lightgbm": calibration_table(y["test"], p_test),
         "logistic": calibration_table(y["test"], predictions["test"]["logistic"]),

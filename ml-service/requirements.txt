@@ -13,3 +13,5 @@ scipy==1.17.1
 joblib==1.4.2
 # Database (read-only roles fintwin_ml / fintwin_ml_labels)
 psycopg[binary]==3.2.3
+# Process memory measurement during training
+psutil==6.1.0

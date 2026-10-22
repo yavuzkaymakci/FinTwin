@@ -3,6 +3,21 @@
 Short working notes so an interrupted session can resume. Newest first. Long-running jobs write to `logs/`
 (gitignored); read the log to see how a job ended.
 
+## Step 4 — ML models (PD, churn, NLP) and backend integration
+
+Done:
+- V8 (8ad35bc): read-only roles `fintwin_ml` (no ground_truth) and `fintwin_ml_labels`; `twin.customer_risk_score`.
+- e780b17: training data pipeline, point-in-time and ground-truth isolation tests.
+- Models trained (logs `logs/train-risk-*.log`, `logs/train-nlp-*.log`, summary `python -m app.training.summary`):
+  PD LightGBM test AUC 0.972 (LR 0.951), churn 0.761 (LR 0.748), NLP char+word macro F1 0.955 (held-out merchants
+  0.722) vs rules 0.831 with MCC / 0.196 text only. Stress evaluation: Spearman(PD, hidden stress) 0.63.
+- FastAPI: /v1/models/active, /v1/risk/score(/batch), /v1/risk/explain, /v1/categorize; 38 pytest green.
+
+Next: backend `com.fintwin.twin.risk` (RestClient + Resilience4j, batch scoring, /api/twins/{id}/risk), then
+docs/models.md, CLAUDE.md, final test runs.
+
+Re-create artifacts (gitignored) after a fresh checkout: `make ml-export-labels ml-train ml-train-nlp ml-evaluate`.
+
 ## Step 3 — Kafka-fed, event-sourced customer twin
 
 Done (committed):

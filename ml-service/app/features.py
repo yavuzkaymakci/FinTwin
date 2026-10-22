@@ -4,6 +4,10 @@ Training (monthly twin snapshots) and serving (current twin state) call the same
 model sees in production are computed exactly like the ones it was trained on. Inputs are the twin's
 ``TwinFeatures`` JSON (camelCase, see backend ``com.fintwin.twin.projection.TwinFeatures``) plus the segment.
 
+The length of the observed history (``incomeMonthsObserved``) is not a feature: it only reflects when the twin's
+history started (it rises from 0 to 6 during the first months of data and is always 6 afterwards), which made it
+the most unstable variable between training and test periods (PSI ~2).
+
 Money levels are deliberately not used directly: prices and incomes inflate by ~30 %/year in the data, which would
 make nominal amounts drift between training and scoring. Amounts are expressed relative to income or spending.
 """
@@ -42,7 +46,6 @@ FEATURE_SPECS: list[FeatureSpec] = [
     FeatureSpec("spend_trend", "Spending trend (30 vs 90 days)", "Harcama trendi (30/90 gün)", "pct"),
     FeatureSpec("income_cv", "Income volatility", "Gelir dalgalanması", "pct"),
     FeatureSpec("salary_day_deviation", "Salary day irregularity", "Maaş günü düzensizliği", "days"),
-    FeatureSpec("income_months_observed", "Months with observed income history", "Gözlenen gelir geçmişi", "count"),
     FeatureSpec("no_income_observed", "No income observed recently", "Son aylarda gelir gözlenmedi", "flag"),
     FeatureSpec("late_payment_count", "Late payments so far", "Gecikmeli ödeme sayısı", "count"),
     FeatureSpec("days_since_last_late", "Days since the last late payment", "Son gecikmeden bu yana geçen gün",
@@ -115,7 +118,6 @@ def from_twin_features(twin: Mapping[str, Any], segment: str | None) -> dict[str
         "spend_trend": _num(twin.get("spendTrend")),
         "income_cv": _num(twin.get("incomeCv")),
         "salary_day_deviation": _num(twin.get("salaryDayDeviation")),
-        "income_months_observed": income_months,
         "no_income_observed": 1.0 if income_months > 0 and not income else 0.0,
         "late_payment_count": _num(twin.get("latePaymentCount")) or 0.0,
         "days_since_last_late": NEVER_LATE_DAYS if days_since_late is None else days_since_late,
