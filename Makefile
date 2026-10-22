@@ -8,10 +8,10 @@ else
   VENV_BIN := .venv/bin
 endif
 
-.PHONY: help up down logs ps backend-run backend-test generate ml-install ml-run ml-test ml-export-labels ml-train ml-train-nlp ml-evaluate frontend-install frontend-run frontend-test frontend-build test
+.PHONY: help up down logs ps backend-run backend-test generate ml-install ml-run ml-test ml-export-labels ml-train ml-train-nlp ml-evaluate ml-backtest ml-presets frontend-install frontend-run frontend-test frontend-build test
 
 help:
-	@echo "Targets: up down logs ps backend-run backend-test generate ml-install ml-run ml-test ml-export-labels ml-train ml-train-nlp ml-evaluate frontend-install frontend-run frontend-test frontend-build test"
+	@echo "Targets: up down logs ps backend-run backend-test generate ml-install ml-run ml-test ml-export-labels ml-train ml-train-nlp ml-evaluate ml-backtest ml-presets frontend-install frontend-run frontend-test frontend-build test"
 
 ## Infrastructure (PostgreSQL, Kafka, Kafka UI)
 up:
@@ -60,6 +60,12 @@ ml-train-nlp:
 
 ml-evaluate:
 	mkdir -p logs && cd ml-service && $(VENV_BIN)/python -m app.evaluation.stress_relationship > ../logs/evaluate-$$(date +%Y%m%d-%H%M%S).log 2>&1
+
+ml-backtest:
+	mkdir -p logs && cd ml-service && $(VENV_BIN)/python -m app.simulation.backtest --start 2025-09-01 --start 2025-12-01 --start 2026-03-01 --start 2026-04-01 --paths 200 > ../logs/backtest-$$(date +%Y%m%d-%H%M%S).log 2>&1
+
+ml-presets:
+	mkdir -p logs && cd ml-service && $(VENV_BIN)/python -m app.simulation.run_presets > ../logs/presets-$$(date +%Y%m%d-%H%M%S).log 2>&1
 
 ## Frontend
 frontend-install:

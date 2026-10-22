@@ -3,6 +3,32 @@
 Short working notes so an interrupted session can resume. Newest first. Long-running jobs write to `logs/`
 (gitignored); read the log to see how a job ended.
 
+## Step 5 — simulation engine
+
+Done:
+- ea4f8ea V9: `simulation` schema (scenario, simulation_run, customer_forecast), 5 presets, fintwin_ml grants.
+- 56b6c00 ml-service `app/simulation/`: scenario schema, macro paths, vectorised engine, results, async jobs,
+  `/v1/simulations` API, back-test and preset CLIs; 67 pytest green.
+- Calibration findings (see docs/simulation.md): absolute re-scoring overshot the back-test (3.6 % vs 2.1 %),
+  expense mean reversion (slope 0.34, measured) and reference-anchored log-odds hazards fixed it.
+- Back-test 200 paths (`logs/backtest-20261022-104616.log`): 2025-09 sim 2.18 % vs obs 2.08 %, 2025-12 1.87 vs
+  1.97, 2026-03 1.68 vs 1.63 (churn 2.98/2.85, 3.09/3.16, 3.02/2.81). 2026-04 crashed (no later snapshot) — fixed.
+- d280c3a backend `com.fintwin.simulation` (scenario CRUD, runs, polling, compare, forecasts), shared client
+  in `com.fintwin.ml`; cde2e9c back-test fix for the last start month.
+- 2026-10-22 re-runs (CPU not shared; the first preset run was interrupted during RECOVERY):
+  presets `logs/presets-20261022-111112.log` (BASE 3.23 %, FX 4.21 %, RATE 3.38 %, STAGFLATION 4.72 %, RECOVERY
+  2.92 %; ~3 min and ~0.5 GB each), back-test incl. 2026-04 `logs/backtest-20261022-111112.log` (2026-04: sim
+  1.72 % vs obs 1.32 %, static also over → model calibration at the data end).
+- Churn analysis (`logs/churn-analysis-*.log`): churn's main driver (active loans) is static in the projection and
+  the stress features lower churn in the model → documented as a limitation with improvement options.
+- Live end-to-end via the backend: scenario SEVERE_FX created (duplicate 409, invalid 400), run 2 QUEUED →
+  RUNNING → SUCCEEDED in 93 s, compare runs 1/2, 4,383 forecasts stored, customer 6 forecast OK, unknown 404.
+  Note: curl from Git Bash on Windows sends non-UTF-8 for Turkish text; post JSON from a UTF-8 file.
+- pytest 67/67 (ruff clean); backend 145/145 (`logs/test-final-20261022-114413.log`).
+
+**Step 5 complete.** Next candidates: frontend (fan chart, scenario comparison), Spring AI scenario assistant (step
+6) using `ScenarioParameters` as the tool schema, churn model macro sensitivity.
+
 ## Step 4 — ML models (PD, churn, NLP) and backend integration
 
 Done:

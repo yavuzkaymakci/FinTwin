@@ -1,7 +1,7 @@
 # FinTwin Architecture
 
-> Status: domain model, synthetic data generator, core banking feed and event-sourced twin implemented; components
-> marked *(planned)* do not exist in
+> Status: domain model, synthetic data generator, core banking feed, event-sourced twin, ML models (PD, churn,
+> categorisation) and the simulation engine are implemented; components marked *(planned)* do not exist in
 > code yet. This document is the target design and is updated as features land.
 
 ## Service overview
@@ -20,7 +20,8 @@ flowchart LR
         API[REST API + Security]
         TWIN["Customer twin<br/>event store · projection · snapshots"]
         FEED["Core banking feed<br/>outbox · bulk/live replay"]
-        SIMO["Simulation orchestration (planned)"]
+        SIMO["Simulation orchestration<br/>scenarios · runs · forecasts"]
+        RISK["Twin risk scoring"]
         AI["Spring AI assistants (planned)<br/>scenario assistant · customer coach"]
         MACRO["Macro data ingestion (planned)"]
         DOMAIN["Retail banking domain<br/>customers · accounts · loans · transactions"]
@@ -28,9 +29,9 @@ flowchart LR
     end
 
     subgraph ML["ml-service · FastAPI (Python)"]
-        MODELS["Behaviour models (planned)<br/>categorisation · cash flow · PD · churn"]
-        SHAP["SHAP explanations (planned)"]
-        SIM["Simulation engine (planned)<br/>Monte Carlo + agent-based"]
+        MODELS["Behaviour models<br/>categorisation · PD · churn"]
+        SHAP["SHAP explanations"]
+        SIM["Simulation engine<br/>Monte Carlo · async jobs"]
     end
 
     PG[("PostgreSQL 16<br/>event store + read models")]
@@ -41,7 +42,7 @@ flowchart LR
 
     RA & PM & CU --> FE
     FE -- "REST /api, /actuator" --> API
-    API --> TWIN & SIMO & AI
+    API --> TWIN & SIMO & AI & RISK
     TWIN -- "twin schema (JDBC)" --> PG
     DOMAIN -- "JPA / Flyway" --> PG
     GEN -- "JDBC batch insert + ground truth" --> PG
@@ -49,8 +50,10 @@ flowchart LR
     FEED -- "8 versioned topics" --> KAFKA
     KAFKA -- "batch listener" --> TWIN
     TWIN -. "twin-updated events (planned)" .-> KAFKA
-    SIMO -- "REST: run scenario" --> SIM
-    API -- "REST: score + explain" --> MODELS
+    SIMO -- "REST: submit + poll jobs" --> SIM
+    RISK -- "REST: batch scoring" --> MODELS
+    SIM -- "read-only (fintwin_ml): twin snapshots, macro" --> PG
+    SIMO -- "scenarios, runs, forecasts" --> PG
     MODELS --- SHAP
     SIM --> MODELS
     AI -- "tool calls" --> SIMO
@@ -66,7 +69,7 @@ flowchart LR
 |-----------|----------------|
 | **frontend** | UI for the three roles; talks only to the backend (dev server proxies `/api` and `/actuator`). |
 | **backend** | System of record. Owns the retail banking domain (customers, accounts, cards, loans, transactions, events), authentication/authorisation, customer twins (event-sourced from Kafka), macro data, scenario orchestration and the Spring AI assistants. Also hosts the deterministic synthetic data generator ([data-generation.md](data-generation.md)). |
-| **ml-service** | Stateless compute: model inference, SHAP explanations, simulation runs. Trains on the public schema and validates against `ground_truth.*`. |
+| **ml-service** | Model training (offline, read-only roles), inference, SHAP explanations and the simulation engine (asynchronous jobs held in memory). Trains on the twin and public schemas; only `app/labeling` and `app/evaluation` may read `ground_truth.*`. See [models.md](models.md) and [simulation.md](simulation.md). |
 | **PostgreSQL** | Domain tables, event store, twin read models, macro time series, simulation results, and the `ground_truth` schema written by the generator. Schema owned by backend Flyway migrations. |
 | **Kafka** | Transport of core banking events to the twin (8 topics + dead letter topics); later twin change events. |
 
@@ -77,9 +80,11 @@ flowchart LR
 1. **Twin update** — the core banking feed replays the outbox to Kafka → the twin appends each event to its event
    store and advances the customer's projection in sequence order (see the event flow below and
    [twin.md](twin.md)). Emitting `TwinUpdated` is planned.
-2. **Scenario run** — analyst (directly or via the scenario assistant) defines macro shocks (FX, rate, inflation) →
-   backend loads twin snapshots + EVDS baseline → ml-service simulation engine runs Monte Carlo paths →
-   portfolio-level results (PD distribution, expected loss, churn) are stored and returned.
+2. **Scenario run** — analyst (directly or via the scenario assistant, planned) picks or defines a scenario
+   (FX, rate, inflation, wage rule) → backend stores the run and submits it with the BASE baseline → the ML
+   service reads the twin snapshot and macro history, runs the Monte Carlo paths and scores them with the PD /
+   churn models → the backend polls, stores the portfolio results and per-customer forecasts
+   ([simulation.md](simulation.md)).
 3. **Customer coaching** — customer asks the coach about a goal → assistant calls cash-flow forecast / simulation tools
    for that single twin → answer includes SHAP-based explanation.
 
@@ -129,8 +134,10 @@ sequenceDiagram
   partition of one topic; the event store is also the re-sequencing buffer.
 - The twin reads neither the core banking tables nor `ground_truth` (enforced by `TwinIsolationTests`).
 
+- The simulation engine lives in the ML service (vectorised NumPy next to the models); the backend owns
+  scenarios and stores results, because ML jobs are in memory only. Models are applied as log-odds shifts
+  against a neutral reference projection so the point-in-time PD is not double counted.
+
 ## Open decisions
 
-- Simulation engine placement: proposed in ml-service (NumPy, close to the models); revisit if latency or
-  orchestration needs push it into the backend.
 - LLM provider for Spring AI.
