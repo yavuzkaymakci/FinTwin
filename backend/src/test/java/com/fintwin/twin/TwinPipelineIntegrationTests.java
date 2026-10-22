@@ -121,6 +121,7 @@ class TwinPipelineIntegrationTests {
 
         assertThat(replay.status().position()).isEqualTo(totalEvents);
         assertThat(eventStore.count()).isEqualTo(totalEvents);
+        assertThat(states.appliedEvents()).as("applied events equal stored events").isEqualTo(totalEvents);
         ConsistencyReport report = consistency.check(5);
         assertThat(report.replayComplete()).isTrue();
         assertThat(report.mismatchedAccounts()).as("%s", report.firstMismatches()).isZero();

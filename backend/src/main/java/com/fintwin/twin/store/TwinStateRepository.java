@@ -171,6 +171,15 @@ public class TwinStateRepository {
         return n == null ? 0 : n;
     }
 
+    /**
+     * Events applied to all twins. Per-customer sequences start at 1 without gaps, so this equals the event-store
+     * row count but reads one row per customer instead of millions.
+     */
+    public long appliedEvents() {
+        Long n = jdbc.queryForObject("SELECT COALESCE(SUM(last_seq), 0) FROM twin.customer_twin_state", Long.class);
+        return n == null ? 0 : n;
+    }
+
     public long countSnapshots() {
         Long n = jdbc.queryForObject("SELECT COUNT(*) FROM twin.customer_twin_snapshot", Long.class);
         return n == null ? 0 : n;
