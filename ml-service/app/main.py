@@ -6,6 +6,7 @@ from app.api.categorize import router as categorize_router
 from app.api.health import router as health_router
 from app.api.models import router as models_router
 from app.api.risk import router as risk_router
+from app.api.simulations import router as simulations_router
 from app.scoring.service import ModelUnavailableError
 
 
@@ -20,6 +21,7 @@ def create_app() -> FastAPI:
     app.include_router(models_router)
     app.include_router(risk_router)
     app.include_router(categorize_router)
+    app.include_router(simulations_router)
 
     @app.exception_handler(ModelUnavailableError)
     async def model_unavailable(_: Request, exc: ModelUnavailableError) -> JSONResponse:

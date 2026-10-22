@@ -46,6 +46,11 @@ def _fmt(value: float, kind: str, tr: bool, mean: bool = False) -> str:
     return f"{value:.0f}"
 
 
+def format_value(value: float, kind: str, tr: bool) -> str:
+    """A feature value in its display unit (%, x, months, days), Turkish or English number format."""
+    return _fmt(value, kind, tr)
+
+
 def reason(feature: str, value: Any, impact: float, means: dict[str, float],
            segment_rates: dict[str, float]) -> dict[str, Any]:
     spec: FeatureSpec = SPEC_BY_NAME[feature]

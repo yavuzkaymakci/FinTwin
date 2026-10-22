@@ -3,6 +3,7 @@ Platt scaling), portfolio statistics for explanations and the rating scale."""
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -55,7 +56,9 @@ class RiskModelArtifact:
 
         if self._explainer is None:
             self._explainer = shap.TreeExplainer(self.booster)
-        values = self._explainer.shap_values(x[MATRIX_COLUMNS])
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="LightGBM binary classifier with TreeExplainer")
+            values = self._explainer.shap_values(x[MATRIX_COLUMNS])
         if isinstance(values, list):  # older shap: one array per class
             values = values[1]
         per_column = pd.DataFrame(np.asarray(values), columns=MATRIX_COLUMNS, index=x.index)
